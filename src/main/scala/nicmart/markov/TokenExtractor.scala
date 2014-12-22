@@ -16,7 +16,7 @@ trait TokenExtractor[A, B] extends (A => Seq[B])
 
 object TokenExtractor {
   implicit lazy val stringTokenExtractor: TokenExtractor[String, String] = new StringTokenExtractor
-  implicit lazy val charTokenExtractor: TokenExtractor[String, Char] = CharTokenExtractor
+  implicit lazy val charTokenExtractor: TokenExtractor[String, Char] = new CharTokenExtractor
 }
 
 class StringTokenExtractor(
@@ -35,6 +35,6 @@ class StringTokenExtractor(
   }
 }
 
-object CharTokenExtractor extends TokenExtractor[String, Char] {
-  override def apply(source: String): Seq[Char] = source
+class CharTokenExtractor(caseSensitive: Boolean = false) extends TokenExtractor[String, Char] {
+  override def apply(source: String): Seq[Char] = if (caseSensitive) source else source.toLowerCase
 }

@@ -28,7 +28,9 @@ class MarkovEngine[SourceType, TokenType]
     val distributions = markovMap(counter(tokens))
 
     lazy val stream: Stream[TokenType] = prefix #::: stream.slidingStream(prefix.length).map { window =>
-      distributions(keyBuilder(window.toSeq))()
+      val key = keyBuilder(window.toSeq)
+      if (distributions.isDefinedAt(key)) distributions(key)()
+      else distributions(keyBuilder(prefix))()
     }
 
     stream

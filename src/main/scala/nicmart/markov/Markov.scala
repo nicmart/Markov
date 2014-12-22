@@ -1,7 +1,6 @@
 package nicmart.markov
 
-import scala.collection.SeqView
-import scala.util.Random
+import nicmart.markov.Helpers._
 
 object Markov {
   type TokenType = String
@@ -18,8 +17,11 @@ object Markov {
 
     val markovStream = engine(sourceString)
 
-    for (token <- markovStream.take(limit)) {
-      print(token.toString + " ")
+    //markovStream.slidingStream()
+    val renderer = new PunctuationWordStreamRenderer[TokenType]
+
+    for (token <- renderer(markovStream.take(limit))) {
+      print(token.toString)
     }
   }
 }
