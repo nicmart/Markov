@@ -38,12 +38,4 @@ class OccurrenciesCounter[T, S] {
   }
 
   def getIndexes = index
-
-  def getDistributionMap: collection.Map[T, WeightedRandomDistribution[S]] = {
-
-    index.mapValues(map => {
-      val values = map.map(pair => WeightedValue(pair._1, pair._2))
-      new WeightedRandomDistribution(values)
-    })
-  }
 }
