@@ -17,14 +17,16 @@ import Helpers._
 trait StreamRenderer[-TokenType] {
   def apply(tokens: Stream[TokenType]): Stream[String]
 
-  def andThen(renderer: StreamRenderer[String]): StreamRenderer[TokenType] = new StreamRenderer[TokenType] {
-    def apply(tokens: Stream[TokenType]) = renderer(this(tokens))
+  def andThen(renderer: StreamRenderer[String]): StreamRenderer[TokenType] = {
+    val that = this
+    new StreamRenderer[TokenType] { def apply(tokens: Stream[TokenType]) = renderer(that(tokens)) }
   }
 }
 
 object StreamRenderer {
-  val noSpaceBefore = Set(".", ",", ";", ":", "'", "?", "!", ")", "]", "}", "»")
-  val noSpaceAfter = Set("'", "(", "[", "{", "«")
+  val noSpaceBefore = Set(".", ",", ";", ":", "'", "?", "!", ")", "]", "}", "»", "’")
+  val noSpaceAfter = Set("'", "(", "[", "{", "«", "’")
+  val capitalizeAfter = Set(".", "?", "!")
 }
 
 class PunctuationWordStreamRenderer[TokenType](
@@ -45,4 +47,27 @@ class PunctuationWordStreamRenderer[TokenType](
 class PunctuationCharStreamRenderer[Char] extends StreamRenderer[Char] {
 
   def apply(tokens: Stream[Char]): Stream[String] = tokens map { _.toString }
+}
+
+object NewLineDecorator extends StreamRenderer[String] {
+  override def apply(tokens: Stream[String]): Stream[String] = {
+    tokens.slidingStream(2) map { tokens: Stream[String] =>
+      val element1 = tokens(0).toString
+      val element2 = tokens(1).toString
+
+      if (element1 == "." && element2 == " ") "\n\n" else element2
+    }
+  }
+}
+
+object CapitalizeAfterDot extends StreamRenderer[String] {
+  override def apply(tokens: Stream[String]): Stream[String] = {
+    tokens.slidingStream(3) map { tokens: Stream[String] =>
+      val element1 = tokens(0).toString
+      val element2 = tokens(1).toString
+      val element3 = tokens(2).toString
+
+      if (StreamRenderer.capitalizeAfter.contains(element1) && element2 == " ") element3.capitalize else element3
+    }
+  }
 }

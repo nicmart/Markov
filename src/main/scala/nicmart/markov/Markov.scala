@@ -1,7 +1,5 @@
 package nicmart.markov
 
-import nicmart.markov.Helpers._
-
 object Markov {
   type TokenType = String
 
@@ -17,8 +15,9 @@ object Markov {
 
     val markovStream = engine(sourceString)
 
-    //markovStream.slidingStream()
-    val renderer = new PunctuationWordStreamRenderer[TokenType]
+    val renderer = (new PunctuationWordStreamRenderer[TokenType])
+      .andThen(CapitalizeAfterDot)
+      .andThen(NewLineDecorator)
 
     for (token <- renderer(markovStream.take(limit))) {
       print(token.toString)
