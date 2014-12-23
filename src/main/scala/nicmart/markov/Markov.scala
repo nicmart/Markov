@@ -1,5 +1,7 @@
 package nicmart.markov
 
+import Helpers._
+
 object Markov {
   type TokenType = String
 
@@ -19,7 +21,9 @@ object Markov {
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    for (token <- renderer(markovStream.take(limit))) {
+    val truncatedStream = markovStream.takeUntil(_ == ".", limit).take(10000)
+
+    for (token <- renderer(truncatedStream)) {
       print(token.toString)
     }
   }
