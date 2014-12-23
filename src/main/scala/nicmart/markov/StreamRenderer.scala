@@ -29,45 +29,56 @@ object StreamRenderer {
   val capitalizeAfter = Set(".", "?", "!")
 }
 
+/**
+ * Transform a token stream putting spaces between words, and checkgin for punctuations
+ */
 class PunctuationWordStreamRenderer[TokenType](
     noSpaceBefore: Set[String] = StreamRenderer.noSpaceBefore,
     noSpaceAfter: Set[String] = StreamRenderer.noSpaceAfter
   ) extends StreamRenderer[TokenType] {
 
   override def apply(tokens: Stream[TokenType]): Stream[String] = {
-    tokens.slidingStream(2) flatMap { tokens: Stream[TokenType] =>
-      val element1 = tokens(0).toString
-      val element2 = tokens(1).toString
-      if (noSpaceAfter.contains(element1) || noSpaceBefore.contains(element2)) Stream(element1)
-      else Stream(element1, " ")
+    tokens.slidingPaddedStream(2, 0) flatMap {
+      case Stream(Some(el1), Some(el2))
+      if (noSpaceAfter.contains(el1.toString) || noSpaceBefore.contains(el2.toString)) => {
+        Stream(el1.toString)
+      }
+      case Stream(Some(el), _) => Stream(el.toString, " ")
     }
   }
 }
 
+/**
+ * Transform a char stream to a string stream
+ */
 class PunctuationCharStreamRenderer[Char] extends StreamRenderer[Char] {
 
   def apply(tokens: Stream[Char]): Stream[String] = tokens map { _.toString }
 }
 
+/**
+ * Transform a stream putting new lines after dots
+ */
 object NewLineDecorator extends StreamRenderer[String] {
-  override def apply(tokens: Stream[String]): Stream[String] = {
-    tokens.slidingStream(2) map { tokens: Stream[String] =>
-      val element1 = tokens(0).toString
-      val element2 = tokens(1).toString
-
-      if (element1 == "." && element2 == " ") "\n\n" else element2
+  def apply(tokens: Stream[String]): Stream[String] = {
+    tokens.slidingPaddedStream(2, 1) map {
+      case Stream(Some("."), Some(" ")) => "\n\n"
+      case Stream(_, Some(element)) => element
     }
   }
 }
 
+/**
+ * Transform a stream capitalizing words after a dot and a space
+ */
 object CapitalizeAfterDot extends StreamRenderer[String] {
-  override def apply(tokens: Stream[String]): Stream[String] = {
-    tokens.slidingStream(3) map { tokens: Stream[String] =>
-      val element1 = tokens(0).toString
-      val element2 = tokens(1).toString
-      val element3 = tokens(2).toString
-
-      if (StreamRenderer.capitalizeAfter.contains(element1) && element2 == " ") element3.capitalize else element3
+  def apply(tokens: Stream[String]): Stream[String] = {
+    tokens.slidingPaddedStream(3, 2) map {
+      case Stream(_, None, Some(element)) => element.capitalize
+      case Stream(Some(prefix), Some(" "), Some(element)) if StreamRenderer.capitalizeAfter.contains(prefix) => {
+        element.capitalize
+      }
+      case Stream(_, _, Some(element)) => element
     }
   }
 }

@@ -23,5 +23,19 @@ object Helpers {
       if (window.length < size) Stream()
       else stream.take(size) #:: stream.drop(step).slidingStream(size)
     }
+
+    def slidingPaddedStream(size: Int, position: Int = 0): Stream[Stream[Option[T]]] = {
+      val prefix: Stream[Option[T]] = fixedLengthAndValueStream[Option[T]](None, position)
+      val suffix: Stream[Option[T]] = fixedLengthAndValueStream[Option[T]](None, size - position - 1)
+
+      val optionStream = stream.map(Some(_))
+
+      (prefix #::: optionStream #::: suffix).slidingStream(size)
+    }
+
+    private def fixedLengthAndValueStream[U](value: U, length: Int): Stream[U] = {
+      if (length == 0) Stream()
+      else value #:: fixedLengthAndValueStream(value, length - 1)
+    }
   }
 }
