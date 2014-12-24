@@ -12,16 +12,16 @@ package nicmart.markov
 /**
  * Trait Description
  */
-trait KeyBuilder[T, S] extends (Iterable[T] => S) {
-  def apply(elements: Iterable[T]): S
+trait KeyBuilder[T, S] extends (Traversable[T] => S) {
+  def apply(elements: Traversable[T]): S
 }
 
 object KeyBuilder {
   implicit val stringsToString = new KeyBuilder[String, String] {
-    def apply(elements: Iterable[String]) = elements.toSeq.mkString(" ")
+    def apply(elements: Traversable[String]) = elements.toSeq.mkString(" ")
   }
 
   implicit val charsToString = new KeyBuilder[Char, String] {
-    def apply(elements: Iterable[Char]) = elements.mkString
+    def apply(elements: Traversable[Char]) = elements.mkString
   }
 }

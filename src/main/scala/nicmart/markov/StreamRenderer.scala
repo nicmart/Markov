@@ -25,7 +25,7 @@ trait StreamRenderer[-TokenType] {
 
 object StreamRenderer {
   val noSpaceBefore = Set(".", ",", ";", ":", "'", "?", "!", ")", "]", "}", "»", "’")
-  val noSpaceAfter = Set("'", "(", "[", "{", "«", "’")
+  val noSpaceAfter = Set("'", "(", "[", "{", "«", "’", "#", "@")
   val capitalizeAfter = Set(".", "?", "!")
 }
 

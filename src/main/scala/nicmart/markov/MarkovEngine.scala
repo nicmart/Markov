@@ -13,27 +13,56 @@ import nicmart.{WeightedRandomDistribution, WeightedValue}
 import nicmart.markov.Helpers._
 
 import scala.collection.Map
+import scala.collection.immutable.Queue
+import scala.collection.mutable
 import scala.util.Random
 
 /**
  * Class Description
  */
 class MarkovEngine[SourceType, TokenType]
-    (windowSize: Int)
+    (source: SourceType, windowSize: Int)
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
-  def apply(source: SourceType): Stream[TokenType] = {
-    val tokens = tokenExtractor(source)
-    val prefix = startKeys(tokens).toStream
-    val distributions = markovMap(counter(tokens))
+  type MarkovMap = Map[String, WeightedRandomDistribution[TokenType]]
+  type SmallerIndexes = mutable.Map[Int, mutable.Map[String, IndexedSeq[String]]]
 
-    lazy val stream: Stream[TokenType] = prefix #::: stream.slidingStream(prefix.length).map { window =>
+  private val tokens: Seq[TokenType] = tokenExtractor(source)
+  private val markovMap: MarkovMap = markovMap(counter(tokens))
+
+  def stream(prefix: Traversable[TokenType]): Stream[TokenType] = {
+    val prefixStream = prefix.toStream
+
+    lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length).map { window =>
       val key = keyBuilder(window.toSeq)
-      if (distributions.isDefinedAt(key)) distributions(key)()
-      else distributions(keyBuilder(prefix))()
+      if (markovMap.isDefinedAt(key)) markovMap(key)()
+      else markovMap(keyBuilder(prefixStream))()
     }
 
     stream
+  }
+
+  def stream(prefix: SourceType): Stream[TokenType] = {
+    stream(randomPrefixFromString(prefix))
+  }
+
+  def stream: Stream[TokenType] = stream(randomStartKeys)
+
+  private def randomPrefixFromString(prefix: SourceType) = {
+    randomPrefixFromTokens(tokenExtractor(prefix))
+  }
+
+  private def isPrefix[T](a: Seq[T], b: Seq[T]) = {
+    a.zip(b) forall { case (x,y) => x == y }
+  }
+
+  private def randomPrefixFromTokens(prefix: Traversable[TokenType]) = {
+    val candidates: Seq[Seq[TokenType]] = tokens.sliding(windowSize - 1).filter(isPrefix(prefix.toSeq, _)).toSeq
+    val length = candidates.length
+
+    if (length == 0) randomStartKeys else {
+      candidates(Random.nextInt(length))
+    }
   }
 
   private def counter(tokens: Seq[TokenType]): OccurrenciesCounter[String, TokenType] = {
@@ -41,7 +70,8 @@ class MarkovEngine[SourceType, TokenType]
 
     for (window <- tokens.sliding(windowSize)) {
       //println(window.take(windowSize - 1).mkString(" "))
-      letterCounter.addElement(keyBuilder(window.take(windowSize - 1)), window.last)
+      val keys: Seq[TokenType] = window.take(windowSize - 1)
+      letterCounter.addElement(keyBuilder(keys), window.last)
     }
 
     letterCounter
@@ -54,7 +84,7 @@ class MarkovEngine[SourceType, TokenType]
     })
   }
 
-  private def startKeys(tokens: Seq[TokenType]) = {
+  private def randomStartKeys = {
     val index = Random.nextInt(tokens.length - windowSize)
     tokens.slice(index, index + windowSize - 1)
   }
