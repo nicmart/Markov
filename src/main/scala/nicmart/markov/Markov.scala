@@ -1,6 +1,7 @@
 package nicmart.markov
 
 import Helpers._
+import IndexType._
 
 object Markov {
   type TokenType = String
@@ -16,7 +17,7 @@ object Markov {
     val sourceString: String = scala.io.Source.fromFile(file)
       .getLines().mkString(" ")
 
-    val indexType = (leftWindowSize, Backward)
+    val indexType = IndexType(leftWindowSize, rightWindowSize, Forward)
     val indexTypes = List(indexType)
 
     val engine = new MarkovEngine[String, TokenType](sourceString, leftWindowSize + rightWindowSize, indexTypes)
