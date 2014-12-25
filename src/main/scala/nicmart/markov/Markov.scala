@@ -6,20 +6,24 @@ object Markov {
   type TokenType = String
 
   def main(args: Array[String]): Unit = {
-    val argsSeq = args.toSeq
-    val limit = if (args.length > 0) args(0).toInt else 1000
-    val windowSize = if (args.length > 1) args(1).toInt else 3
-    val file = if (args.length > 2) args(2) else "mostrasprint"
-    val prefix: String = if (args.length > 3) args(3) else ""
+    val arguments = getArg(args) _
+    val leftWindowSize = arguments(0, "2").toInt
+    val rightWindowSize = arguments(1, "1").toInt
+    val limit = arguments(2, "1000").toInt
+    val file = arguments(3, "mostrasprint")
+    val prefix = arguments(4, "")
 
     val sourceString: String = scala.io.Source.fromFile(file)
       .getLines().mkString(" ")
 
-    val engine = new MarkovEngine[String, TokenType](sourceString, windowSize)
+    val indexType = (leftWindowSize, Backward)
+    val indexTypes = List(indexType)
+
+    val engine = new MarkovEngine[String, TokenType](sourceString, leftWindowSize + rightWindowSize, indexTypes)
 
     val markovStream = prefix match {
-      case "" => engine.stream
-      case _ => engine.stream(prefix)
+      case "" => engine.stream(indexType)
+      case _ => engine.stream(prefix, indexType)
     }
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
@@ -31,5 +35,9 @@ object Markov {
     for (token <- renderer(truncatedStream)) {
       print(token.toString)
     }
+  }
+
+  def getArg(args: Array[String])(position: Int, default: String) = {
+    if (args.isDefinedAt(position)) args(position) else default
   }
 }

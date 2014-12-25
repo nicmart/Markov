@@ -21,7 +21,7 @@ object Helpers {
     def slidingStream(size: Int, step: Int = 1): Stream[Stream[T]] = {
       val window = stream.take(size)
       if (window.length < size) Stream()
-      else stream.take(size) #:: stream.drop(step).slidingStream(size)
+      else stream.take(size) #:: stream.drop(step).slidingStream(size, step)
     }
 
     def slidingPaddedStream(size: Int, position: Int = 0): Stream[Stream[Option[T]]] = {
