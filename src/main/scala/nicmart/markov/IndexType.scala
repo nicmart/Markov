@@ -20,12 +20,19 @@ case class IndexType(keyLength: Int, valueLength: Int, direction: Direction) {
    * is the values sequence
    */
   def keysAndValues[T](window: Seq[T]): (Seq[T], Seq[T]) = {
-    if (direction == Forward) window.splitAt(keyLength) else window.splitAt(valueLength).swap
+    if (direction == Forward) window.splitAt(keyLength) else window.reverse.splitAt(keyLength)
   }
+
+  def opposite = IndexType(keyLength, valueLength, direction.opposite)
 }
 
 object IndexType {
-  sealed abstract class Direction
+  sealed abstract class Direction {
+    def opposite: Direction = this match {
+      case Forward => Backward
+      case Backward => Forward
+    }
+  }
 
   case object Forward extends Direction
   case object Backward extends Direction

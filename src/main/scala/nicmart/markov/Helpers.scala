@@ -33,7 +33,7 @@ object Helpers {
       (prefix #::: optionStream #::: suffix).slidingStream(size)
     }
 
-    def takeUntil(predicate: T => Boolean, times: Int = 1) = {
+    def takeUntil(predicate: T => Boolean, times: Int = 1, include: Boolean = true) = {
       val countStream = stream.scanLeft(1) { (count, element) =>
         if (predicate(element)) count + 1
         else count

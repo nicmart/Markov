@@ -18,22 +18,30 @@ object Markov {
       .getLines().mkString(" ")
 
     val indexType = IndexType(leftWindowSize, rightWindowSize, Forward)
-    val indexTypes = List(indexType)
+    val indexTypes = List(indexType, indexType.opposite)
 
     val engine = new MarkovEngine[String, TokenType](sourceString, leftWindowSize + rightWindowSize, indexTypes)
 
-    val markovStream = prefix match {
-      case "" => engine.stream(indexType)
-      case _ => engine.stream(prefix, indexType)
-    }
+    val startSequence = if (prefix == "") {
+      engine.generateStartSequence(indexType)
+    } else engine.generateStartSequence(prefix, indexType)
+
+    println("StartSequence:")
+    println(startSequence.mkString(" "))
+
+    val markovStream = engine.stream(startSequence, indexType)
+    val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
+    val reversedStream = reverseMarkovStream.takeUntil(_ == ".", limit, false).take(10000).dropRight(1)
     val truncatedStream = markovStream.takeUntil(_ == ".", limit).take(10000)
 
-    for (token <- renderer(truncatedStream)) {
+    val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
+
+    for (token <- renderer(finalStream)) {
       print(token.toString)
     }
   }

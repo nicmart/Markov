@@ -48,52 +48,32 @@ class MarkovEngine[SourceType, TokenType]
   }
 
   /**
-   * Build a stream only by index type, rabdomly choosing the prefix
-   */
-  def stream(indexType: IndexType): Stream[TokenType] = stream(randomStartKeys(indexType), indexType)
-
-  /**
-   * Build a stream from a sequence of tokens
-   */
-  def stream(prefix: Traversable[TokenType]): Stream[TokenType] = {
-    stream(prefix, defaultIndexType)
-  }
-
-  /**
-   * Build a stream from a prefix of the same type of the source
-   */
-  def stream(prefix: SourceType): Stream[TokenType] = {
-
-    stream(randomPrefixFromString(prefix, defaultIndexType))
-  }
-
-  /**
    * Build a stream from a prefix of the same type of the source
    */
   def stream(prefix: SourceType, indexType: IndexType): Stream[TokenType] = {
-    stream(randomPrefixFromString(prefix, indexType), indexType)
+    stream(generateStartSequence(prefix, indexType), indexType)
   }
 
-  /**
-   * Build a stream using a randomly chosen starting point
-   */
-  def stream: Stream[TokenType] = stream(randomStartKeys)
+  def generateStartSequence(prefix: SourceType, indexType: IndexType): Seq[TokenType] = {
+    generateStartSequence(tokenExtractor(prefix), indexType)
+  }
 
-  private def randomPrefixFromString(prefix: SourceType, indexType: IndexType) = {
-    randomPrefixFromTokens(tokenExtractor(prefix), indexType)
+  def generateStartSequence(prefix: Traversable[TokenType], indexType: IndexType): Seq[TokenType] = {
+    val candidates: Seq[Seq[TokenType]] = tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
+    val length = candidates.length
+
+    if (length == 0) generateStartSequence(indexType) else {
+      candidates(Random.nextInt(length))
+    }
+  }
+
+  def generateStartSequence(indexType: IndexType): Seq[TokenType] = {
+    val index = Random.nextInt(tokens.length - windowSize)
+    tokens.slice(index, index + indexType.keyLength)
   }
 
   private def isPrefix[T](a: Seq[T], b: Seq[T]) = {
     a.zip(b) forall { case (x,y) => x == y }
-  }
-
-  private def randomPrefixFromTokens(prefix: Traversable[TokenType], indexType: IndexType) = {
-    val candidates: Seq[Seq[TokenType]] = tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
-    val length = candidates.length
-
-    if (length == 0) randomStartKeys else {
-      candidates(Random.nextInt(length))
-    }
   }
 
   /**
@@ -126,14 +106,5 @@ class MarkovEngine[SourceType, TokenType]
       val values = map.map(pair => WeightedValue(pair._1, pair._2))
       new WeightedRandomDistribution(values)
     })
-  }
-
-  private def randomStartKeys(indexType: IndexType): Seq[TokenType] = {
-    val index = Random.nextInt(tokens.length - windowSize)
-    tokens.slice(index, index + indexType.keyLength)
-  }
-
-  private def randomStartKeys: Seq[TokenType] = {
-    randomStartKeys(defaultIndexType)
   }
 }
