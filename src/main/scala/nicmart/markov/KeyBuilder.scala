@@ -18,7 +18,7 @@ trait KeyBuilder[T, S] extends (Traversable[T] => S) {
 
 object KeyBuilder {
   implicit val stringsToString = new KeyBuilder[String, String] {
-    def apply(elements: Traversable[String]) = elements.toSeq.mkString(" ")
+    def apply(elements: Traversable[String]) = elements.map(_.toLowerCase).toSeq.mkString(" ")
   }
 
   implicit val charsToString = new KeyBuilder[Char, String] {

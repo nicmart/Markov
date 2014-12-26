@@ -33,7 +33,6 @@ class OccurrenciesCounter[T, S] {
   }
 
   def getCount(key: T, element: S) = {
-
     index.get(key).map(_.getOrElse(element, 0)).getOrElse(0)
   }
 

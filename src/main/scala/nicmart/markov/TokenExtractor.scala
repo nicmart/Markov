@@ -12,17 +12,22 @@ package nicmart.markov
 /**
  * Trait Description
  */
-trait TokenExtractor[A, B] extends (A => Seq[B])
+trait TokenExtractor[A, B] extends (A => Seq[B]) {
+  def apply(source: A): Seq[B]
+}
 
 object TokenExtractor {
   implicit lazy val stringTokenExtractor: TokenExtractor[String, String] = new StringTokenExtractor
   implicit lazy val charTokenExtractor: TokenExtractor[String, Char] = new CharTokenExtractor
+  implicit lazy val linesTokenExtractor: TokenExtractor[Traversable[String], String] = {
+    SequenceTokenExtractor(stringTokenExtractor)
+  }
 }
 
 class StringTokenExtractor(
     splitRegex: String = "((?=[^0-9a-zA-Zèéòçàùì ])|(?<=[^0-9a-zA-Zèéòçàùì ])| )",
     trim: Boolean = true,
-    caseSensitive: Boolean = false
+    caseSensitive: Boolean = true
   ) extends TokenExtractor[String, String] {
 
   override def apply(source: String): Seq[String] = {
@@ -37,4 +42,10 @@ class StringTokenExtractor(
 
 class CharTokenExtractor(caseSensitive: Boolean = false) extends TokenExtractor[String, Char] {
   override def apply(source: String): Seq[Char] = if (caseSensitive) source else source.toLowerCase
+}
+
+case class SequenceTokenExtractor[A, B](extractor: TokenExtractor[A, B]) extends TokenExtractor[Traversable[A], B] {
+  override def apply(source: Traversable[A]): Seq[B] = {
+    source.flatMap(extractor(_)).toSeq
+  }
 }

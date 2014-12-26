@@ -30,6 +30,7 @@ class MarkovEngine[SourceType, TokenType]
   private val markovMaps: Map[IndexType, MarkovMap] = indicize
   private val defaultIndexType = indexTypes(0)
 
+
   /**
    * Build the stream given a prefix
    */
@@ -40,8 +41,12 @@ class MarkovEngine[SourceType, TokenType]
 
     lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length, slidingStep).flatMap { window =>
       val key = keyBuilder(window.toSeq)
+      println(key)
       if (markovMap.isDefinedAt(key)) markovMap(key)()
-      else markovMap(keyBuilder(prefixStream))()
+      else {
+        println(s"---missed key---: ${key}")
+        markovMap(keyBuilder(prefixStream))()
+      }
     }
 
     stream
@@ -59,7 +64,8 @@ class MarkovEngine[SourceType, TokenType]
   }
 
   def generateStartSequence(prefix: Traversable[TokenType], indexType: IndexType): Seq[TokenType] = {
-    val candidates: Seq[Seq[TokenType]] = tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
+    val candidates: Seq[Seq[TokenType]] =
+      tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
     val length = candidates.length
 
     if (length == 0) generateStartSequence(indexType) else {
@@ -72,8 +78,8 @@ class MarkovEngine[SourceType, TokenType]
     tokens.slice(index, index + indexType.keyLength)
   }
 
-  private def isPrefix[T](a: Seq[T], b: Seq[T]) = {
-    a.zip(b) forall { case (x,y) => x == y }
+  private def isPrefix(a: Seq[TokenType], b: Seq[TokenType]) = {
+    keyBuilder(a) == keyBuilder(b.take(a.length))
   }
 
   /**
@@ -103,8 +109,12 @@ class MarkovEngine[SourceType, TokenType]
       counter: OccurrenciesCounter[String, Seq[TokenType]]
     ): Map[String, WeightedRandomDistribution[Seq[TokenType]]] = {
     counter.getIndexes.mapValues(map => {
-      val values = map.map(pair => WeightedValue(pair._1, pair._2))
+      val values = map.map{case (value, weight) => WeightedValue(value, weight)}
       new WeightedRandomDistribution(values)
     })
+  }
+
+  private def getKeyForCounter(keys: Seq[TokenType], counter: OccurrenciesCounter[String, Seq[TokenType]]) = {
+    val stringKey = keyBuilder(keys)
   }
 }

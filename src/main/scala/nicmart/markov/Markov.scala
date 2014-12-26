@@ -28,6 +28,7 @@ object Markov {
 
     println("StartSequence:")
     println(startSequence.mkString(" "))
+    println("-" * 40)
 
     val markovStream = engine.stream(startSequence, indexType)
     val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
@@ -41,9 +42,12 @@ object Markov {
 
     val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
 
-    for (token <- renderer(finalStream)) {
-      print(token.toString)
-    }
+    println("-" * 40)
+    val tokens = renderer(finalStream).map(_.toString).force
+
+    println("-" * 40)
+    println("Final String:")
+    println(tokens.mkString)
   }
 
   def getArg(args: Array[String])(position: Int, default: String) = {
