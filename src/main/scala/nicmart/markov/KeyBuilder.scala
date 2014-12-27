@@ -22,6 +22,6 @@ object KeyBuilder {
   }
 
   implicit val charsToString = new KeyBuilder[Char, String] {
-    def apply(elements: Traversable[Char]) = elements.mkString
+    def apply(elements: Traversable[Char]) = elements.map(_.toLower).mkString
   }
 }

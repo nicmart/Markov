@@ -41,12 +41,16 @@ class MarkovEngine[SourceType, TokenType]
 
     lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length, slidingStep).flatMap { window =>
       val key = keyBuilder(window.toSeq)
-      println(key)
-      if (markovMap.isDefinedAt(key)) markovMap(key)()
-      else {
-        println(s"---missed key---: ${key}")
-        markovMap(keyBuilder(prefixStream))()
+
+      val next = {
+        if (markovMap.isDefinedAt(key)) markovMap(key)()
+        else {
+          println(s"---missed key---: ${key}")
+          markovMap(keyBuilder(prefixStream))()
+        }
       }
+      println(s"${key} --> ${next.mkString}")
+      next
     }
 
     stream

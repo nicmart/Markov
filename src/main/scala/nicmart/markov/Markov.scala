@@ -2,6 +2,7 @@ package nicmart.markov
 
 import Helpers._
 import IndexType._
+import com.gravity.goose.Goose
 
 object Markov {
   type TokenType = String
@@ -11,11 +12,10 @@ object Markov {
     val leftWindowSize = arguments(0, "2").toInt
     val rightWindowSize = arguments(1, "1").toInt
     val limit = arguments(2, "1000").toInt
-    val file = arguments(3, "mostrasprint")
+    val source = arguments(3, "mostrasprint")
     val prefix = arguments(4, "")
 
-    val sourceString: String = scala.io.Source.fromFile(file)
-      .getLines().mkString(" ")
+    val sourceString = getSource(source)
 
     val indexType = IndexType(leftWindowSize, rightWindowSize, Forward)
     val indexTypes = List(indexType, indexType.opposite)
@@ -37,7 +37,7 @@ object Markov {
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    val reversedStream = reverseMarkovStream.takeUntil(_ == ".", limit, false).take(10000).dropRight(1)
+    val reversedStream = reverseMarkovStream.takeUntil(_ == ".", 1, false).take(10000).dropRight(1)
     val truncatedStream = markovStream.takeUntil(_ == ".", limit).take(10000)
 
     val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
@@ -53,4 +53,25 @@ object Markov {
   def getArg(args: Array[String])(position: Int, default: String) = {
     if (args.isDefinedAt(position)) args(position) else default
   }
+
+  def config = {
+    val conf = new com.gravity.goose.Configuration
+    conf.setEnableImageFetching(false)
+    conf
+  }
+
+  def getPageText(uri: String) = {
+    val goose = new Goose(config)
+    val article = goose.extractContent(uri)
+    article.cleanedArticleText
+    //Ok("hi")
+  }
+
+  def getSource(argument: String): String =
+    if (argument.startsWith("http://")) {
+      getPageText(argument)
+    } else {
+      scala.io.Source.fromFile(argument)
+        .getLines().mkString(" ")
+    }
 }
