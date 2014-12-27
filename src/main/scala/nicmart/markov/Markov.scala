@@ -15,7 +15,7 @@ object Markov {
     val source = arguments(3, "mostrasprint")
     val prefix = arguments(4, "")
 
-    val sourceString = getSource(source)
+    val sourceString = source.split("\\|").map(getSource(_)).mkString("\n\n")
 
     val indexType = IndexType(leftWindowSize, rightWindowSize, Forward)
     val indexTypes = List(indexType, indexType.opposite)
