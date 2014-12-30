@@ -14,22 +14,15 @@ import scala.collection.generic.FilterMonadic
 /**
  * A Markov Chain that output something between transitions
  */
-trait MarkovChain[State, T, CollectionType[_] <: Iterable[_]] {
-  def next(from: State): (State, CollectionType[T])
+trait MarkovChain[State, T, TCollection <: Iterable[T]] {
+  def next(from: State): Option[(State, TCollection)]
 
-  def stream(from: State): Stream[(State, CollectionType[T])] = {
-    val (state, output) = next(from)
-    (state, output) #:: stream(state)
+  def stream(from: State): Stream[(State, TCollection)] = next(from) match {
+    case None => Stream()
+    case Some((state, output)) => (state, output) #:: stream(state)
   }
 
-  //wrong type...
-  def t(c: CollectionType[T]) = c.toStream
+  def outputStream(from: State): Stream[TCollection] = stream(from).map(_._2)
 
-  def outputStream(from: State): Stream[CollectionType[T]] = stream(from).map(_._2)
-
-  //def flattenOutputStream(from: State): Stream[T] = stream(from).map(_._2.toStream).flatten
-}
-
-class Test extends MarkovChain[String, String, Seq] {
-  override def next(from: String): (String, Seq[String]) = (from, List())
+  def flattenOutputStream(from: State): Stream[T] = stream(from).flatMap(_._2)
 }
