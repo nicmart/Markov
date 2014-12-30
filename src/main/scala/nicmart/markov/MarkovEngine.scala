@@ -23,34 +23,27 @@ class MarkovEngine[SourceType, TokenType]
     (source: SourceType, windowSize: Int, indexTypes: Seq[IndexType])
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
-  type MarkovMap = Map[String, WeightedRandomDistribution[Seq[TokenType]]]
-  type SmallerIndexes = mutable.Map[Int, mutable.Map[String, IndexedSeq[String]]]
+  type Distribution = String => Option[Seq[TokenType]]
 
   private val tokens: Seq[TokenType] = tokenExtractor(source)
-  private val markovMaps: Map[IndexType, MarkovMap] = indicize
+  private val distributions: Map[IndexType, Distribution] = indicize
   private val defaultIndexType = indexTypes(0)
 
 
   /**
    * Build the stream given a prefix
    */
-  def stream(prefix: Traversable[TokenType], indexType: IndexType) = {
-    val markovMap: MarkovMap = markovMaps.getOrElse(indexType, throw new NoSuchElementException)
+  def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
+    val distribution: Distribution = distributions.getOrElse(indexType, (x: String) => None)
     val prefixStream = prefix.toStream
     val slidingStep = indexType.valueLength
 
     lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length, slidingStep).flatMap { window =>
       val key = keyBuilder(window.toSeq)
-
-      val next = {
-        if (markovMap.isDefinedAt(key)) markovMap(key)()
-        else {
-          println(s"---missed key---: ${key}")
-          markovMap(keyBuilder(prefixStream))()
-        }
+      distribution(key) match {
+        case None => Stream()
+        case Some(tokens) => tokens
       }
-      println(s"${key} --> ${next.mkString}")
-      next
     }
 
     stream
@@ -89,7 +82,7 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Build the index of markov maps
    */
-  private def indicize: Map[IndexType, MarkovMap] = {
+  private def indicize: Map[IndexType, Distribution] = {
     val counters = mutable.Map[IndexType, OccurrenciesCounter[String, Seq[TokenType]]]()
 
     indexTypes foreach {
@@ -106,16 +99,17 @@ class MarkovEngine[SourceType, TokenType]
     }
 
     // Build distributions
-    counters mapValues (markovMapFromCounter(_))
+    counters mapValues (distributionFromCounter(_))
   }
 
-  private def markovMapFromCounter(
+  private def distributionFromCounter(
       counter: OccurrenciesCounter[String, Seq[TokenType]]
-    ): Map[String, WeightedRandomDistribution[Seq[TokenType]]] = {
-    counter.getIndexes.mapValues(map => {
+    ): String => Option[Seq[TokenType]] = {
+    val distributionsMap = counter.getIndexes.mapValues(map => {
       val values = map.map{case (value, weight) => WeightedValue(value, weight)}
       new WeightedRandomDistribution(values)
     })
+    (x: String) => if (distributionsMap.isDefinedAt(x)) Some(distributionsMap(x)()) else None
   }
 
   private def getKeyForCounter(keys: Seq[TokenType], counter: OccurrenciesCounter[String, Seq[TokenType]]) = {
