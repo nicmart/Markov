@@ -23,7 +23,9 @@ class MarkovEngine[SourceType, TokenType]
     (source: SourceType, windowSize: Int, indexTypes: Seq[IndexType])
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
-  type Distribution = String => Option[Seq[TokenType]]
+  type Distribution = State => Option[Input]
+  type State = Traversable[TokenType]
+  type Input = Traversable[TokenType]
 
   private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributions: Map[IndexType, Distribution] = indicize
@@ -34,14 +36,13 @@ class MarkovEngine[SourceType, TokenType]
    * Build the stream given a prefix
    */
   def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
-    val distribution: Distribution = distributions.getOrElse(indexType, (x: String) => None)
+    val distribution: Distribution = distributions.getOrElse(indexType, _ => None)
     val prefixStream = prefix.toStream
     val slidingStep = indexType.valueLength
 
     lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length, slidingStep).flatMap { window =>
-      val key = keyBuilder(window.toSeq)
-      distribution(key) match {
-        case None => Stream()
+      distribution(window.toSeq) match {
+        case None => { println("-" * 50); Stream() }
         case Some(tokens) => tokens
       }
     }
@@ -104,12 +105,15 @@ class MarkovEngine[SourceType, TokenType]
 
   private def distributionFromCounter(
       counter: OccurrenciesCounter[String, Seq[TokenType]]
-    ): String => Option[Seq[TokenType]] = {
+    ): State => Option[Input] = {
     val distributionsMap = counter.getIndexes.mapValues(map => {
       val values = map.map{case (value, weight) => WeightedValue(value, weight)}
       new WeightedRandomDistribution(values)
     })
-    (x: String) => if (distributionsMap.isDefinedAt(x)) Some(distributionsMap(x)()) else None
+    (from: State) => {
+      val key = keyBuilder(from)
+      if (distributionsMap.isDefinedAt(key)) Some(distributionsMap(key)()) else None
+    }
   }
 
   private def getKeyForCounter(keys: Seq[TokenType], counter: OccurrenciesCounter[String, Seq[TokenType]]) = {
