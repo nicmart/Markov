@@ -16,5 +16,5 @@ class SymbolStringAutomaton[T](keyLength: Int) extends StateAutomaton[Traversabl
   type Input = Traversable[T]
   type State = Traversable[T]
 
-  def transition(from: State, symbol: Input): State = (from ++ symbol).take(keyLength)
+  def transition(from: State, symbol: Input): State = (from ++ symbol).toSeq.takeRight(keyLength)
 }

@@ -20,7 +20,10 @@ trait StateAutomatonChain[State, Input, T, TCollection <: Iterable[T]] extends M
   def output(from: State, input: Input, to: State): TCollection
 
   override def next(from: State): Option[(State, TCollection)] = distribution(from) map { input =>
-    val to = automaton.transition(from, distribution(from))
+    val to = automaton.transition(from, distribution(from).get)
+    println(s"From: ${from.toString}")
+    println(s"Input: ${input.toString}")
+    println(s"To: ${to.toString}")
     (to, output(from, input, to))
   }
 }

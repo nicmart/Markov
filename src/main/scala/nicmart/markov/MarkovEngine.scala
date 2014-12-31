@@ -27,27 +27,28 @@ class MarkovEngine[SourceType, TokenType]
   type State = Traversable[TokenType]
   type Input = Traversable[TokenType]
 
+  private val automatons: IndexType => StateAutomaton[State, State] = indexTypes.map{
+    indexType => (indexType, new SymbolStringAutomaton[TokenType](indexType.keyLength))
+  }.toMap
+
   private val tokens: Seq[TokenType] = tokenExtractor(source)
-  private val distributions: Map[IndexType, Distribution] = indicize
+  private val distributions: IndexType => Distribution = indicize
+
+  private val chains: IndexType => DefaultStateAutomatonChain[State, Input] = indexTypes.map{
+    indexType => (indexType, DefaultStateAutomatonChain[State, Input](automatons(indexType), distributions(indexType)))
+  }.toMap
+
+
   private val defaultIndexType = indexTypes(0)
 
-
-  /**
-   * Build the stream given a prefix
-   */
   def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
-    val distribution: Distribution = distributions.getOrElse(indexType, _ => None)
-    val prefixStream = prefix.toStream
-    val slidingStep = indexType.valueLength
+    val from: State = prefix.take(indexType.keyLength)
+    val outputStream: Stream[Input] = chains(indexType).flattenOutputStream(from)
+    prefix.toStream ++ outputStream.flatten
+  }
 
-    lazy val stream: Stream[TokenType] = prefixStream #::: stream.slidingStream(prefixStream.length, slidingStep).flatMap { window =>
-      distribution(window.toSeq) match {
-        case None => { println("-" * 50); Stream() }
-        case Some(tokens) => tokens
-      }
-    }
-
-    stream
+  def test(from: State, indexType: IndexType): Unit = {
+    chains(indexType).flattenOutputStream(from)
   }
 
   /**
@@ -83,7 +84,7 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Build the index of markov maps
    */
-  private def indicize: Map[IndexType, Distribution] = {
+  private def indicize: IndexType => Distribution = {
     val counters = mutable.Map[IndexType, OccurrenciesCounter[String, Seq[TokenType]]]()
 
     indexTypes foreach {
@@ -100,7 +101,9 @@ class MarkovEngine[SourceType, TokenType]
     }
 
     // Build distributions
-    counters mapValues (distributionFromCounter(_))
+    val distMap = counters mapValues (distributionFromCounter(_))
+
+    (indexType: IndexType) => distMap.getOrElse(indexType, _ => None)
   }
 
   private def distributionFromCounter(
@@ -114,9 +117,5 @@ class MarkovEngine[SourceType, TokenType]
       val key = keyBuilder(from)
       if (distributionsMap.isDefinedAt(key)) Some(distributionsMap(key)()) else None
     }
-  }
-
-  private def getKeyForCounter(keys: Seq[TokenType], counter: OccurrenciesCounter[String, Seq[TokenType]]) = {
-    val stringKey = keyBuilder(keys)
   }
 }

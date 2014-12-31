@@ -2,7 +2,7 @@ package nicmart.markov
 
 import Helpers._
 import IndexType._
-import com.gravity.goose.Goose
+//import com.gravity.goose.Goose
 
 object Markov {
   type TokenType = String
@@ -31,16 +31,17 @@ object Markov {
     println("-" * 40)
 
     val markovStream = engine.stream(startSequence, indexType)
-    val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
+    //val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    val reversedStream = reverseMarkovStream.takeUntil(_ == ".", 1, false).take(10000).dropRight(1)
+    //val reversedStream = reverseMarkovStream.takeUntil(_ == ".", 1, false).take(10000).dropRight(1)
     val truncatedStream = markovStream.takeUntil(_ == ".", limit).take(10000)
 
-    val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
+    //val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
+    val finalStream = truncatedStream.drop(startSequence.length)
 
     println("-" * 40)
     val tokens = renderer(finalStream).map(_.toString).force
@@ -55,16 +56,17 @@ object Markov {
   }
 
   def config = {
-    val conf = new com.gravity.goose.Configuration
-    conf.setEnableImageFetching(false)
-    conf
+    //val conf = new com.gravity.goose.Configuration
+    //conf.setEnableImageFetching(false)
+    //conf
   }
 
   def getPageText(uri: String) = {
-    val goose = new Goose(config)
+    /*val goose = new Goose(config)
     val article = goose.extractContent(uri)
-    article.cleanedArticleText
+    article.cleanedArticleText*/
     //Ok("hi")
+    "ah"
   }
 
   def getSource(argument: String): String =

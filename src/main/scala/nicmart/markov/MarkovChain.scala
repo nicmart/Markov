@@ -9,8 +9,6 @@
 
 package nicmart.markov
 
-import scala.collection.generic.FilterMonadic
-
 /**
  * A Markov Chain that output something between transitions
  */
