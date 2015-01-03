@@ -25,7 +25,7 @@ object TokenExtractor {
 }
 
 class StringTokenExtractor(
-    splitRegex: String = "((?=[^0-9a-zA-Zèéòçàùì ])|(?<=[^0-9a-zA-Zèéòçàùì ])| )",
+    splitRegex: String = "(?<=\\p{P})(?=\\P{P})|(?<=\\P{P})(?=\\p{P})| ",
     trim: Boolean = true,
     caseSensitive: Boolean = true
   ) extends TokenExtractor[String, String] {

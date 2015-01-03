@@ -31,17 +31,16 @@ object Markov {
     println("-" * 40)
 
     val markovStream = engine.stream(startSequence, indexType)
-    //val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
+    val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    //val reversedStream = reverseMarkovStream.takeUntil(_ == ".", 1, false).take(10000).dropRight(1)
-    val truncatedStream = markovStream.takeUntil(_ == ".", limit).take(10000)
+    val reversedStream = reverseMarkovStream.takeUntil(".", 1, false).take(10000).dropRight(1)
+    val truncatedStream = markovStream.takeUntil(".", limit).take(10000)
 
-    //val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
-    val finalStream = truncatedStream.drop(startSequence.length)
+    val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
 
     println("-" * 40)
     val tokens = renderer(finalStream).map(_.toString).force

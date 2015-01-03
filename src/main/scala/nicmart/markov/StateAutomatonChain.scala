@@ -20,11 +20,18 @@ trait StateAutomatonChain[State, Input, T, TCollection <: Iterable[T]] extends M
   def output(from: State, input: Input, to: State): TCollection
 
   override def next(from: State): Option[(State, TCollection)] = distribution(from) map { input =>
-    val to = automaton.transition(from, distribution(from).get)
-    println(s"From: ${from.toString}")
-    println(s"Input: ${input.toString}")
-    println(s"To: ${to.toString}")
+    val to = automaton.transition(from, input)
+    log("%s ==> %s ==> %s", from, input, to)
     (to, output(from, input, to))
+  }
+
+  private def toString[T](el: T) = el match {
+    case e: Traversable[_] => e.mkString(" ")
+    case _ => el.toString
+  }
+
+  private def log(format: String, from: State, input: Input, to: State) = {
+    println(format.format(toString(from), toString(input), toString(to)))
   }
 }
 

@@ -33,7 +33,7 @@ object Helpers {
       (prefix #::: optionStream #::: suffix).slidingStream(size)
     }
 
-    def takeUntil(predicate: T => Boolean, times: Int = 1, include: Boolean = true) = {
+    def takeUntil(predicate: T => Boolean, times: Int, include: Boolean): Stream[T] = {
       val countStream = stream.scanLeft(1) { (count, element) =>
         if (predicate(element)) count + 1
         else count
@@ -41,6 +41,10 @@ object Helpers {
       stream.zip(countStream)
         .takeWhile{ case (element, count) => count <= times }
         .map{ case(element, count) => element }
+    }
+
+    def takeUntil(symbol: T, times: Int = 1, include: Boolean = true): Stream[T] = {
+      takeUntil(_ == symbol, times, include)
     }
 
     private def fixedLengthAndValueStream[U](value: U, length: Int): Stream[U] = {

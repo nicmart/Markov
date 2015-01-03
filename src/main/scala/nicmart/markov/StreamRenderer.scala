@@ -24,23 +24,23 @@ trait StreamRenderer[-TokenType] {
 }
 
 object StreamRenderer {
-  val noSpaceBefore = Set(".", ",", ";", ":", "'", "?", "!", ")", "]", "}", "»", "’")
-  val noSpaceAfter = Set("'", "(", "[", "{", "«", "’", "#", "@")
-  val capitalizeAfter = Set(".", "?", "!")
+  val noSpaceBeforeRegexp = """(\.|,|;|:|'|\?|!|\)|\]|\}|»|’).*"""
+  val noSpaceAfterRegexp = """('|\(|\[|\{|«|’|#|@).*"""
+  val capitalizeAfterRegexp = """(\.|\?|!).*"""
 }
 
 /**
  * Transform a token stream putting spaces between words, and checkgin for punctuations
  */
 class PunctuationWordStreamRenderer[TokenType](
-    noSpaceBefore: Set[String] = StreamRenderer.noSpaceBefore,
-    noSpaceAfter: Set[String] = StreamRenderer.noSpaceAfter
+    noSpaceBefore: String = StreamRenderer.noSpaceBeforeRegexp,
+    noSpaceAfter: String = StreamRenderer.noSpaceAfterRegexp
   ) extends StreamRenderer[TokenType] {
 
   override def apply(tokens: Stream[TokenType]): Stream[String] = {
     tokens.slidingPaddedStream(2, 0) flatMap {
       case Stream(Some(el1), Some(el2))
-      if (noSpaceAfter.contains(el1.toString) || noSpaceBefore.contains(el2.toString)) => {
+      if (el1.toString.matches(noSpaceAfter) || el2.toString.matches(noSpaceBefore)) => {
         Stream(el1.toString)
       }
       case Stream(Some(el), _) => Stream(el.toString, " ")
@@ -75,7 +75,7 @@ object CapitalizeAfterDot extends StreamRenderer[String] {
   def apply(tokens: Stream[String]): Stream[String] = {
     tokens.slidingPaddedStream(3, 2) map {
       case Stream(_, None, Some(element)) => element.capitalize
-      case Stream(Some(prefix), Some(" "), Some(element)) if StreamRenderer.capitalizeAfter.contains(prefix) => {
+      case Stream(Some(prefix), Some(" "), Some(element)) if prefix.matches(StreamRenderer.capitalizeAfterRegexp) => {
         element.capitalize
       }
       case Stream(_, _, Some(element)) => element
