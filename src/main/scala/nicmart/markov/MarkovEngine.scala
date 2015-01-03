@@ -23,19 +23,20 @@ class MarkovEngine[SourceType, TokenType]
     (source: SourceType, windowSize: Int, indexTypes: Seq[IndexType])
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
-  type Distribution = State => Option[Input]
+  type Distribution = (IndexType, State) => Option[Input]
   type State = Traversable[TokenType]
   type Input = Traversable[TokenType]
+  type IndexedState = String
 
   private val automatons: IndexType => StateAutomaton[State, State] = indexTypes.map{
     indexType => (indexType, new SymbolStringAutomaton[TokenType](indexType.keyLength))
   }.toMap
 
   private val tokens: Seq[TokenType] = tokenExtractor(source)
-  private val distributions: IndexType => Distribution = indicize
+  private val distributions: Distribution = indicize
 
   private val chains: IndexType => DefaultStateAutomatonChain[State, Input] = indexTypes.map{
-    indexType => (indexType, DefaultStateAutomatonChain[State, Input](automatons(indexType), distributions(indexType)))
+    indexType => (indexType, DefaultStateAutomatonChain[State, Input](automatons(indexType), (s: State) => distributions(indexType, s)))
   }.toMap
 
 
@@ -84,38 +85,35 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Build the index of markov maps
    */
-  private def indicize: IndexType => Distribution = {
+  private def indicize: Distribution = {
     val counters = mutable.Map[IndexType, OccurrenciesCounter[String, Seq[TokenType]]]()
 
     indexTypes foreach {
       indexType => counters(indexType) = new OccurrenciesCounter[String, Seq[TokenType]]
     }
 
-    // Build counters
-    for (
+    // Build counter maps
+    val elementsToCount = for (
         window <- tokens.sliding(windowSize);
         (indexType, counter) <- counters;
         (keys, values) = indexType.keysAndValues(window)
-    ) {
-      counter.addElement(keyBuilder(keys), values)
+    ) yield ((indexType, keyBuilder(keys)), values)
+
+    val countMaps: Counter.PrefixedCountMap[(IndexType, String), Input] = Counter.countPairs(elementsToCount.toTraversable)
+
+    val randomDistribs = countMaps.mapValues{ countMap: Map[Input, Int] =>
+      new WeightedRandomDistribution(countMap.map{case (value, weight) => WeightedValue(value, weight)})
     }
 
-    // Build distributions
-    val distMap = counters mapValues (distributionFromCounter(_))
-
-    (indexType: IndexType) => distMap.getOrElse(indexType, _ => None)
+    distribution(randomDistribs)
   }
 
-  private def distributionFromCounter(
-      counter: OccurrenciesCounter[String, Seq[TokenType]]
-    ): State => Option[Input] = {
-    val distributionsMap = counter.getIndexes.mapValues(map => {
-      val values = map.map{case (value, weight) => WeightedValue(value, weight)}
-      new WeightedRandomDistribution(values)
-    })
-    (from: State) => {
+  private def distribution(
+      randomDistribs: Map[(IndexType, IndexedState), WeightedRandomDistribution[Input]]
+    ): Distribution = {
+    (indexType: IndexType, from: State) => {
       val key = keyBuilder(from)
-      if (distributionsMap.isDefinedAt(key)) Some(distributionsMap(key)()) else None
+      if (randomDistribs.isDefinedAt((indexType, key))) Some(randomDistribs((indexType, key))()) else None
     }
   }
 }
