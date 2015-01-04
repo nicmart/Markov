@@ -11,9 +11,8 @@ object Markov {
     val arguments = getArg(args) _
     val leftWindowSize = arguments(0, "2").toInt
     val rightWindowSize = arguments(1, "1").toInt
-    val limit = arguments(2, "1000").toInt
-    val source = arguments(3, "mostrasprint")
-    val prefix = arguments(4, "")
+    val source = arguments(2, "mostrasprint")
+    val prefix = arguments(3, "")
 
     val sourceString = source.split("\\|").map(getSource(_)).mkString("\n\n")
 
@@ -38,16 +37,18 @@ object Markov {
       .andThen(NewLineDecorator)
 
     val reversedStream = reverseMarkovStream.takeUntil(".", 1, false).take(10000).dropRight(1)
-    val truncatedStream = markovStream.takeUntil(".", limit).take(10000)
+    val finalStream = reversedStream.reverse #::: markovStream.drop(startSequence.length)
 
-    val finalStream = reversedStream.reverse #::: truncatedStream.drop(startSequence.length)
+    val sentencesStream: Stream[Stream[String]] = finalStream.sentenceStream(".").map(renderer(_))
 
-    println("-" * 40)
-    val tokens = renderer(finalStream).map(_.toString).force
+    // Input stream. I add an element on the head to always print the first sentence
+    val linesStream = "" #:: io.Source.stdin.getLines.takeWhile(_ != "quit").toStream
 
-    println("-" * 40)
-    println("Final String:")
-    println(tokens.mkString)
+    val sentencesAndInput: Stream[(Stream[String], String)] = sentencesStream.zip(linesStream)
+
+    for ((sentence, _) <- sentencesAndInput) {
+      println(sentence.mkString)
+    }
   }
 
   def getArg(args: Array[String])(position: Int, default: String) = {

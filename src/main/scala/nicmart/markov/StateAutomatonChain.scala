@@ -21,7 +21,7 @@ trait StateAutomatonChain[State, Input, T, TCollection <: Iterable[T]] extends M
 
   override def next(from: State): Option[(State, TCollection)] = distribution(from) map { input =>
     val to = automaton.transition(from, input)
-    log("%s ==> %s ==> %s", from, input, to)
+    //log("%s ==> %s ==> %s", from, input, to)
     (to, output(from, input, to))
   }
 

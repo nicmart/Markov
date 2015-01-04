@@ -24,9 +24,9 @@ trait StreamRenderer[-TokenType] {
 }
 
 object StreamRenderer {
-  val noSpaceBeforeRegexp = """(\.|,|;|:|'|\?|!|\)|\]|\}|»|’).*"""
-  val noSpaceAfterRegexp = """('|\(|\[|\{|«|’|#|@).*"""
-  val capitalizeAfterRegexp = """(\.|\?|!).*"""
+  val noSpaceBeforeRegexp = """^(\.|,|;|:|'|\?|!|\)|\]|\}|»|’|…).*"""
+  val noSpaceAfterRegexp = """^('|\(|\[|\{|«|’|#|@).*"""
+  val capitalizeAfterRegexp = """^(\.|\?|!).*"""
 }
 
 /**
@@ -62,7 +62,7 @@ class PunctuationCharStreamRenderer[Char] extends StreamRenderer[Char] {
 object NewLineDecorator extends StreamRenderer[String] {
   def apply(tokens: Stream[String]): Stream[String] = {
     tokens.slidingPaddedStream(2, 1) map {
-      case Stream(Some("."), Some(" ")) => "\n\n"
+      //case Stream(Some("."), Some(" ")) => "\n\n"
       case Stream(_, Some(element)) => element
     }
   }

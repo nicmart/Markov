@@ -47,6 +47,20 @@ object Helpers {
       takeUntil(_ == symbol, times, include)
     }
 
+    def sentenceStream(predicate: T => Boolean, maxSentenceLength: Int): Stream[Stream[T]] = {
+      val index = stream.take(maxSentenceLength).indexWhere(predicate)
+      val splitPoint = if (index >= 0) index + 1 else maxSentenceLength
+      val (sentence, tail) = stream.splitAt(splitPoint)
+      tail match {
+        case Stream() => Stream(sentence)
+        case _ => sentence #:: tail.sentenceStream(predicate, maxSentenceLength)
+      }
+    }
+
+    def sentenceStream(endOfSentence: T, maxSentenceLength: Int = 1000): Stream[Stream[T]] = {
+      sentenceStream(_ == endOfSentence, maxSentenceLength)
+    }
+
     private def fixedLengthAndValueStream[U](value: U, length: Int): Stream[U] = {
       if (length == 0) Stream()
       else value #:: fixedLengthAndValueStream(value, length - 1)
