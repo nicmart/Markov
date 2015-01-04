@@ -2,7 +2,7 @@ package nicmart.markov
 
 import Helpers._
 import IndexType._
-//import com.gravity.goose.Goose
+import com.gravity.goose.Goose
 
 object Markov {
   type TokenType = String
@@ -11,35 +11,26 @@ object Markov {
     val arguments = getArg(args) _
     val leftWindowSize = arguments(0, "2").toInt
     val rightWindowSize = arguments(1, "1").toInt
-    val source = arguments(2, "mostrasprint")
-    val prefix = arguments(3, "")
+    val samePrefixPerSentence = arguments(2, "true").toBoolean
+    val source = arguments(3, "mostrasprint")
+    val prefix = arguments(4, "")
 
     val sourceString = source.split("\\|").map(getSource(_)).mkString("\n\n")
-
     val indexType = IndexType(leftWindowSize, rightWindowSize, Forward)
     val indexTypes = List(indexType, indexType.opposite)
 
     val engine = new MarkovEngine[String, TokenType](sourceString, leftWindowSize + rightWindowSize, indexTypes)
-
-    val startSequence = if (prefix == "") {
-      engine.generateStartSequence(indexType)
-    } else engine.generateStartSequence(prefix, indexType)
-
-    println("StartSequence:")
-    println(startSequence.mkString(" "))
-    println("-" * 40)
-
-    val markovStream = engine.stream(startSequence, indexType)
-    val reverseMarkovStream = engine.stream(startSequence.reverse, indexType.opposite)
+    val startSequenceGenerator = engine.startSequenceGenerator(prefix, indexType)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    val reversedStream = reverseMarkovStream.takeUntil(".", 1, false).take(10000).dropRight(1)
-    val finalStream = reversedStream.reverse #::: markovStream.drop(startSequence.length)
-
-    val sentencesStream: Stream[Stream[String]] = finalStream.sentenceStream(".").map(renderer(_))
+    val sentencesStream: Stream[Stream[String]] = (if (samePrefixPerSentence) Helpers.inifiniteStream {
+      engine.sentenceStream(startSequenceGenerator(), indexType, ".").take(1)
+    } else {
+      engine.sentenceStream(startSequenceGenerator(), indexType, ".")
+    }).map(renderer(_))
 
     // Input stream. I add an element on the head to always print the first sentence
     val linesStream = "" #:: io.Source.stdin.getLines.takeWhile(_ != "quit").toStream
@@ -49,6 +40,13 @@ object Markov {
     for ((sentence, _) <- sentencesAndInput) {
       println(sentence.mkString)
     }
+
+    val mb = 1024*1024
+    val runtime = Runtime.getRuntime
+    println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
+    println("** Free Memory:  " + runtime.freeMemory / mb)
+    println("** Total Memory: " + runtime.totalMemory / mb)
+    println("** Max Memory:   " + runtime.maxMemory / mb)
   }
 
   def getArg(args: Array[String])(position: Int, default: String) = {
@@ -56,17 +54,15 @@ object Markov {
   }
 
   def config = {
-    //val conf = new com.gravity.goose.Configuration
-    //conf.setEnableImageFetching(false)
-    //conf
+    val conf = new com.gravity.goose.Configuration
+    conf.setEnableImageFetching(false)
+    conf
   }
 
   def getPageText(uri: String) = {
-    /*val goose = new Goose(config)
+    val goose = new Goose(config)
     val article = goose.extractContent(uri)
-    article.cleanedArticleText*/
-    //Ok("hi")
-    "ah"
+    article.cleanedArticleText
   }
 
   def getSource(argument: String): String =

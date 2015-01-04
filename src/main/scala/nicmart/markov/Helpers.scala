@@ -66,4 +66,24 @@ object Helpers {
       else value #:: fixedLengthAndValueStream(value, length - 1)
     }
   }
+
+  implicit class ImprovedMap[A, B](map: Map[A, B]) {
+    def reindexBy[C](p: A => C): Map[C, Map[A, B]] = {
+      val initialMap = Map[C, Map[A, B]]()
+      map.foldLeft(initialMap){
+        case (newMap, (oldIndex, value)) => {
+          val newKey = p(oldIndex)
+          val submap = if(newMap.isDefinedAt(newKey)) newMap(newKey) else Map[A, B]()
+          newMap.updated(newKey, submap.updated(oldIndex, value))
+        }
+      }
+    }
+  }
+
+  /**
+   * Given a stream passed by name, build an infinite stream composed by repetitions of the passed stream
+   */
+  def inifiniteStream[T](stream: => Stream[T]): Stream[T] = {
+    stream #::: inifiniteStream(stream)
+  }
 }

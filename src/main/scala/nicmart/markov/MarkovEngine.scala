@@ -46,6 +46,9 @@ class MarkovEngine[SourceType, TokenType]
 
   private val defaultIndexType = indexTypes(0)
 
+  /**
+   * The Markov chain stream
+   */
   def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
     val from: State = prefix.take(indexType.keyLength)
     val outputStream: Stream[Input] = chains(indexType).flattenOutputStream(from)
@@ -53,29 +56,40 @@ class MarkovEngine[SourceType, TokenType]
   }
 
   /**
-   * Build a stream from a prefix of the same type of the source
+   * Build the stream of sentences
    */
-  def stream(prefix: SourceType, indexType: IndexType): Stream[TokenType] = {
-    stream(generateStartSequence(prefix, indexType), indexType)
+  def sentenceStream(
+    startSequence: Input,
+    indexType: IndexType,
+    separator: TokenType
+  ): Stream[Stream[TokenType]] = {
+
+    val forwardStream: Stream[TokenType] = stream(startSequence, indexType)
+    val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, indexType.opposite)
+
+    val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
+    val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
+
+    markovStream.sentenceStream(separator)
   }
 
-  def generateStartSequence(prefix: SourceType, indexType: IndexType): Seq[TokenType] = {
-    generateStartSequence(tokenExtractor(prefix), indexType)
-  }
-
-  def generateStartSequence(prefix: Traversable[TokenType], indexType: IndexType): Seq[TokenType] = {
+  def startSequenceGenerator(prefix: Traversable[TokenType], indexType: IndexType): () => Seq[TokenType] = {
     val candidates: Seq[Seq[TokenType]] =
       tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
     val length = candidates.length
 
-    if (length == 0) generateStartSequence(indexType) else {
-      candidates(Random.nextInt(length))
+    () => {
+      if (length == 0) {
+        val index = Random.nextInt(tokens.length - windowSize)
+        tokens.slice(index, index + indexType.keyLength)
+      } else {
+        candidates(Random.nextInt(length))
+      }
     }
   }
 
-  def generateStartSequence(indexType: IndexType): Seq[TokenType] = {
-    val index = Random.nextInt(tokens.length - windowSize)
-    tokens.slice(index, index + indexType.keyLength)
+  def startSequenceGenerator(prefix: SourceType, indexType: IndexType): () => Seq[TokenType] = {
+    startSequenceGenerator(tokenExtractor(prefix), indexType)
   }
 
   private def isPrefix(a: Seq[TokenType], b: Seq[TokenType]) = {
@@ -94,6 +108,17 @@ class MarkovEngine[SourceType, TokenType]
     ) yield ((indexType, keyBuilder(keys)), values)
 
     val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
+
+    println("-" * 40)
+    println("Entropy Stats")
+    countMaps.reindexBy(_._1).foreach{
+      case (indexType, map) => println(s"${indexType.toString}: ${(new ChainStats(map)).entropy}")
+    }
+
+    val stats = new ChainStats(countMaps)
+
+    println("Global Entropy: " + stats.entropy)
+    println("-" * 40)
 
     countMaps.mapValues{ countMap: Map[Input, Int] =>
       new WeightedRandomDistribution(countMap.map{case (value, weight) => WeightedValue(value, weight)})
