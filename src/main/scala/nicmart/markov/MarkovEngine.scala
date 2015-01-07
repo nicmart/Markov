@@ -112,12 +112,20 @@ class MarkovEngine[SourceType, TokenType]
     println("-" * 40)
     println("Entropy Stats")
     countMaps.reindexBy(_._1).foreach{
-      case (indexType, map) => println(s"${indexType.toString}: ${(new ChainStats(map)).entropy}")
+      case (indexType, map) => {
+        map.reindexBy(_._2.matches(".*\\p{P}.*")).foreach{
+          case (withPunctuation, innerMap) => {
+            val dotString = if (withPunctuation) "with punct." else "without punct."
+            val (mean, deviation) = (new ChainStats(innerMap)).entropyMeanAndDeviation
+            println(s"${indexType.toString} (${dotString}). mean: ${mean}, deviation: ${deviation}")
+          }
+        }
+      }
     }
 
-    val stats = new ChainStats(countMaps)
+    val (mean, deviation) = (new ChainStats(countMaps)).entropyMeanAndDeviation
 
-    println("Global Entropy: " + stats.entropy)
+    println("Global Entropy: " + mean + "/" + deviation)
     println("-" * 40)
 
     countMaps.mapValues{ countMap: Map[Input, Int] =>

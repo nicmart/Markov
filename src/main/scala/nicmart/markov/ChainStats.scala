@@ -21,9 +21,12 @@ class ChainStats[T, S](data: Map[T, Map[S, Int]]) {
     -normalizedValues.map(prob => prob * math.log(prob)).reduceLeft(_ + _)
   }
 
-  def entropy: Double = {
+  def entropyMeanAndDeviation: (Double, Double) = {
     val entropies: Iterable[Double] = data.values.map(entropy(_))
-
-    entropies.sum / entropies.size
+    val size = entropies.size
+    val mean = entropies.sum / size
+    val variance = entropies.map(x => math.pow(x - mean, 2)).sum / size
+    val deviation = math.sqrt(variance)
+    (mean, deviation)
   }
 }
