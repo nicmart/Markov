@@ -80,6 +80,21 @@ object Helpers {
     }
   }
 
+  implicit class TraversableWithStats[T : Numeric](sequence: Traversable[T]) {
+    lazy val entropy: Double = {
+      val num = implicitly[Numeric[T]]
+      val sum = num.toDouble(sequence.sum)
+      sequence.view
+        .map(num.toDouble(_) / sum)
+        .map( x => -x * math.log(x))
+        .sum
+    }
+  }
+
+  implicit class MapWithStats[S, T: Numeric](map: Map[S, T])  {
+    lazy val entropy: Double = map.values.entropy
+  }
+
   /**
    * Given a stream passed by name, build an infinite stream composed by repetitions of the passed stream
    */

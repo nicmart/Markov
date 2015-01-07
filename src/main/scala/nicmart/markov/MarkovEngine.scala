@@ -12,8 +12,6 @@ package nicmart.markov
 import nicmart.{WeightedRandomDistribution, WeightedValue}
 import nicmart.markov.Helpers._
 
-import scala.collection.Map
-import scala.collection.mutable
 import scala.util.Random
 
 /**
@@ -32,15 +30,25 @@ class MarkovEngine[SourceType, TokenType]
    * For each IndexType, define the state automaton
    */
   private val automatons: IndexType => StateAutomaton[State, State] = indexTypes.map{
-    indexType => (indexType, new SymbolStringAutomaton[TokenType](indexType.keyLength))
+    indexType => (
+      indexType,
+      new SymbolStringAutomaton[TokenType](indexType.keyLength)
+    )
   }.toMap
 
 
   private val tokens: Seq[TokenType] = tokenExtractor(source)
-  private val distributions: Distribution = distributionFromMap(distributionsMap)
+  private val distributionMapsWithEntropy = distributionsMap
+  private val distributions: Distribution = distributionFromMap(distributionMapsWithEntropy)
 
   private val chains: IndexType => DefaultStateAutomatonChain[State, Input] = indexTypes.map{
-    indexType => (indexType, DefaultStateAutomatonChain[State, Input](automatons(indexType), (s: State) => distributions(indexType, s)))
+    indexType => (
+      indexType,
+      DefaultStateAutomatonChain[State, Input](
+        automatons(indexType),
+        (s: State) => distributions(indexType, s)
+      )
+    )
   }.toMap
 
 
@@ -73,7 +81,10 @@ class MarkovEngine[SourceType, TokenType]
     markovStream.sentenceStream(separator)
   }
 
-  def startSequenceGenerator(prefix: Traversable[TokenType], indexType: IndexType): () => Seq[TokenType] = {
+  def startSequenceGenerator(
+    prefix: Traversable[TokenType],
+    indexType: IndexType
+  ): () => Seq[TokenType] = {
     val candidates: Seq[Seq[TokenType]] =
       tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
     val length = candidates.length
@@ -99,12 +110,12 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Build the index of markov maps
    */
-  private def distributionsMap: Map[(IndexType, IndexedState), WeightedRandomDistribution[Input]] = {
+  private def distributionsMap: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])] = {
     // Build counter maps
     val elementsToCount = for (
-        window <- tokens.sliding(windowSize);
-        indexType <- indexTypes;
-        (keys, values) = indexType.keysAndValues(window)
+      window <- tokens.sliding(windowSize);
+      indexType <- indexTypes;
+      (keys, values) = indexType.keysAndValues(window)
     ) yield ((indexType, keyBuilder(keys)), values)
 
     val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
@@ -128,17 +139,18 @@ class MarkovEngine[SourceType, TokenType]
     println("Global Entropy: " + mean + "/" + deviation)
     println("-" * 40)
 
-    countMaps.mapValues{ countMap: Map[Input, Int] =>
+    countMaps.mapValues{ countMap: Map[Input, Int] => (
+      countMap.entropy,
       new WeightedRandomDistribution(countMap.map{case (value, weight) => WeightedValue(value, weight)})
-    }
+    )}
   }
 
   private def distributionFromMap(
-      randomDistribs: Map[(IndexType, IndexedState), WeightedRandomDistribution[Input]]
+      randomDistribs: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])]
     ): Distribution = {
     (indexType: IndexType, from: State) => {
       val key = keyBuilder(from)
-      if (randomDistribs.isDefinedAt((indexType, key))) Some(randomDistribs((indexType, key))()) else None
+      if (randomDistribs.isDefinedAt((indexType, key))) Some(randomDistribs((indexType, key))._2()) else None
     }
   }
 }
