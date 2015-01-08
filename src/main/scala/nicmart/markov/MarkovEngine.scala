@@ -19,9 +19,9 @@ import scala.util.Random
  * Class Description
  *
  * @todo
- *       1. Pass only the MAX indexType size to the engine
- *       2. Index for all the types from 1 to the MAX
- *       3. Define only ONE automaton with keyLength = MAX
+ *       1. Pass only the MAX indexType size to the engine DONE
+ *       2. Index for all the types from 1 to the MAX DONE
+ *       3. Define only ONE automaton with keyLength = MAX DONE
  *       4. The state has so to be intended as a window of MAX length
  *       5. The dist function passed to the chain has to select the index type for which the given input
  *          has the closest entropy to the given one (0.1 should be a good fit)
@@ -42,17 +42,7 @@ class MarkovEngine[SourceType, TokenType]
     .map(IndexType(_, inputSize, Forward))
     .flatMap(indexType => List(indexType, indexType.opposite))
 
-  /**
-   * For each IndexType, define the state automaton
-   */
-  private val automatons: IndexType => StateAutomaton[State, State] = indexTypes.map{
-    indexType => (
-      indexType,
-      new SymbolStringAutomaton[TokenType](indexType.keyLength)
-    )
-  }.toMap
-
-
+  private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](maxStateSize)
   private val maxWindowSize = maxStateSize + inputSize
   private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributionMapsWithEntropy = distributionsMap
@@ -62,7 +52,7 @@ class MarkovEngine[SourceType, TokenType]
     indexType => (
       indexType,
       DefaultStateAutomatonChain[State, Input](
-        automatons(indexType),
+        automaton,
         (s: State) => distributions(indexType, s)
       )
     )
