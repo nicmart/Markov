@@ -9,6 +9,7 @@
 
 package nicmart.markov
 
+import nicmart.markov.IndexType.Forward
 import nicmart.{WeightedRandomDistribution, WeightedValue}
 import nicmart.markov.Helpers._
 
@@ -26,13 +27,20 @@ import scala.util.Random
  *          has the closest entropy to the given one (0.1 should be a good fit)
  */
 class MarkovEngine[SourceType, TokenType]
-    (source: SourceType, windowSize: Int, indexTypes: Seq[IndexType])
+    (source: SourceType, maxStateSize: Int, inputSize: Int)
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
   type Distribution = (IndexType, State) => Option[Input]
   type State = Traversable[TokenType]
   type Input = Traversable[TokenType]
   type IndexedState = String
+
+  /**
+   * Index Types: forward and backward from 1 to the maxStateSize
+   */
+  val indexTypes: Seq[IndexType] = (1 to maxStateSize)
+    .map(IndexType(_, inputSize, Forward))
+    .flatMap(indexType => List(indexType, indexType.opposite))
 
   /**
    * For each IndexType, define the state automaton
@@ -45,6 +53,7 @@ class MarkovEngine[SourceType, TokenType]
   }.toMap
 
 
+  private val maxWindowSize = maxStateSize + inputSize
   private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributionMapsWithEntropy = distributionsMap
   private val distributions: Distribution = distributionFromMap(distributionMapsWithEntropy)
@@ -99,7 +108,7 @@ class MarkovEngine[SourceType, TokenType]
 
     () => {
       if (length == 0) {
-        val index = Random.nextInt(tokens.length - windowSize)
+        val index = Random.nextInt(tokens.length - maxWindowSize)
         tokens.slice(index, index + indexType.keyLength)
       } else {
         candidates(Random.nextInt(length))
@@ -121,7 +130,7 @@ class MarkovEngine[SourceType, TokenType]
   private def distributionsMap: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])] = {
     // Build counter maps
     val elementsToCount = for (
-      window <- tokens.sliding(windowSize);
+      window <- tokens.sliding(maxWindowSize);
       indexType <- indexTypes;
       (keys, values) = indexType.keysAndValues(window)
     ) yield ((indexType, keyBuilder(keys)), values)
