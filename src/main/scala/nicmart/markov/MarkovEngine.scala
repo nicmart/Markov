@@ -22,7 +22,7 @@ import scala.util.Random
  *       1. Pass only the MAX indexType size to the engine DONE
  *       2. Index for all the types from 1 to the MAX DONE
  *       3. Define only ONE automaton with keyLength = MAX DONE
- *       4. The state has so to be intended as a window of MAX length
+ *       4. The state has so to be intended as a window of MAX length DONE
  *       5. The dist function passed to the chain has to select the index type for which the given input
  *          has the closest entropy to the given one (0.1 should be a good fit)
  */
@@ -127,21 +127,34 @@ class MarkovEngine[SourceType, TokenType]
 
     val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
 
-    println("-" * 40)
+    println("-" * 80)
     println("Entropy Stats")
-    countMaps.reindexBy(_._1).foreach{
+    countMaps.reindexBy(_._1).filter{case (IndexType(_,_, Forward), _) => true; case _ => false}.foreach{
       case (indexType, map) => {
         map.reindexBy(_._2.matches(".*\\p{P}.*")).foreach{
           case (withPunctuation, innerMap) => {
             val dotString = if (withPunctuation) "with punct." else "without punct."
-            val (mean, deviation) = (new ChainStats(innerMap)).entropyMeanAndDeviation
+            val (mean, deviation, entropies) = (new ChainStats(innerMap)).entropyMeanAndDeviation
             println(s"${indexType.toString} (${dotString}). mean: ${mean}, deviation: ${deviation}")
+            println("Entropies (Top 10): ")
+            val total = entropies.size
+            val stats = entropies.groupBy(x => x)
+              .map{case (entropy, list) => (entropy, list.size, math.pow(2, entropy))}
+              .toList
+              .sortBy{ case (_, count, _) => -count}
+              .take(10)
+            stats.foreach{case (entropy, count, exp) =>
+              val ratio = (count.toDouble / total) * 100
+              val percentage = "%.2f".format(ratio)
+              println(s"${"%.3f".format(entropy)} (${percentage}% - ${count}) - exp: ${"%.3f".format(exp)}")
+            }
+            println("-" * 80)
           }
         }
       }
     }
 
-    val (mean, deviation) = (new ChainStats(countMaps)).entropyMeanAndDeviation
+    val (mean, deviation, _) = (new ChainStats(countMaps)).entropyMeanAndDeviation
 
     println("Global Entropy: " + mean + "/" + deviation)
     println("-" * 40)
@@ -159,5 +172,11 @@ class MarkovEngine[SourceType, TokenType]
       val key = keyBuilder(from)
       if (randomDistribs.isDefinedAt((indexType, key))) Some(randomDistribs((indexType, key))._2()) else None
     }
+  }
+
+  private def selectIndexType(state: State) = {
+    val states = state.scanRight(List[TokenType]())((token, list) => token :: list)
+
+
   }
 }

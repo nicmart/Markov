@@ -86,7 +86,7 @@ object Helpers {
       val sum = num.toDouble(sequence.sum)
       sequence.view
         .map(num.toDouble(_) / sum)
-        .map( x => -x * math.log(x))
+        .map( x => -x * math.log(x)  / math.log(2))
         .sum
     }
   }
