@@ -24,8 +24,7 @@ case class IndexType(keyLength: Int, valueLength: Int, direction: Direction) {
   }
 
   def keys[T](sequence: Traversable[T]): Traversable[T] = {
-    val seq = if (direction == Forward) sequence else sequence.toSeq.reverse
-    seq.drop(sequence.size - keyLength)
+    sequence.drop(sequence.size - keyLength)
   }
 
   def opposite = IndexType(keyLength, valueLength, direction.opposite)

@@ -19,16 +19,16 @@ object Markov {
     val indexType = IndexType(windowSize - 1, 1, Forward)
 
     val engine = new MarkovEngine[String, TokenType](sourceString, windowSize, exponentialEntropy)
-    val startSequenceGenerator = engine.startSequenceGenerator(prefix, indexType)
+    val startSequenceGenerator = engine.startSequenceGenerator(prefix)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
     val sentencesStream: Stream[Stream[String]] = (if (samePrefixPerSentence) Helpers.inifiniteStream {
-      engine.sentenceStream(startSequenceGenerator(), indexType, ".").take(1)
+      engine.sentenceStream(startSequenceGenerator(), Forward, ".").take(1)
     } else {
-      engine.sentenceStream(startSequenceGenerator(), indexType, ".")
+      engine.sentenceStream(startSequenceGenerator(), Forward, ".")
     }).map(renderer(_))
 
     // Input stream. I add an element on the head to always print the first sentence

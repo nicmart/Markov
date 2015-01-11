@@ -9,7 +9,7 @@
 
 package nicmart.markov
 
-import nicmart.markov.IndexType.{Direction, Forward}
+import nicmart.markov.IndexType.{Backward, Direction, Forward}
 import nicmart.{WeightedRandomDistribution, WeightedValue}
 import nicmart.markov.Helpers._
 
@@ -42,27 +42,26 @@ class MarkovEngine[SourceType, TokenType]
     .map(keySize => IndexType(keySize, windowSize - keySize, Forward))
     .flatMap(indexType => List(indexType, indexType.opposite))
 
+  private val stateSize = windowSize - 1
   private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](windowSize - 1)
   private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributionMapsWithEntropy: Map[
       (IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])
     ] = distributionsMap
 
-  private val chain: DefaultStateAutomatonChain[State, Input] =
-    DefaultStateAutomatonChain[State, Input](
-      automaton,
-      distribution(_, Forward)
-    )
-
+  private val chains: Direction => DefaultStateAutomatonChain[State, Input] = Map(
+    Forward -> DefaultStateAutomatonChain[State, Input](automaton, distribution(_, Forward)),
+    Backward -> DefaultStateAutomatonChain[State, Input](automaton, distribution(_, Backward))
+  )
 
   private val defaultIndexType = indexTypes(0)
 
   /**
    * The Markov chain stream
    */
-  def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
-    val from: State = prefix.take(indexType.keyLength)
-    val outputStream: Stream[Input] = chain.flattenOutputStream(from)
+  def stream(prefix: Traversable[TokenType], direction: Direction): Stream[TokenType] = {
+    val from: State = prefix.take(stateSize)
+    val outputStream: Stream[Input] = chains(direction).flattenOutputStream(from)
     prefix.toStream ++ outputStream.flatten
   }
 
@@ -71,40 +70,36 @@ class MarkovEngine[SourceType, TokenType]
    */
   def sentenceStream(
     startSequence: Input,
-    indexType: IndexType,
+    direction: Direction,
     separator: TokenType
   ): Stream[Stream[TokenType]] = {
 
-    val forwardStream: Stream[TokenType] = stream(startSequence, indexType)
-    //val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, indexType.opposite)
+    val forwardStream: Stream[TokenType] = stream(startSequence, direction)
+    val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, direction.opposite)
 
-    //val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
-    //val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
-    val markovStream = forwardStream.drop(startSequence.length)
+    val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
+    val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
 
     markovStream.sentenceStream(separator)
   }
 
-  def startSequenceGenerator(
-    prefix: Traversable[TokenType],
-    indexType: IndexType
-  ): () => Seq[TokenType] = {
+  def startSequenceGenerator(prefix: Traversable[TokenType]): () => Seq[TokenType] = {
     val candidates: Seq[Seq[TokenType]] =
-      tokens.sliding(indexType.keyLength).filter(isPrefix(prefix.toSeq, _)).toSeq
+      tokens.sliding(windowSize - 1).filter(isPrefix(prefix.toSeq, _)).toSeq
     val length = candidates.length
 
     () => {
       if (length == 0) {
         val index = Random.nextInt(tokens.length - windowSize)
-        tokens.slice(index, index + indexType.keyLength)
+        tokens.slice(index, index + windowSize - 1)
       } else {
         candidates(Random.nextInt(length))
       }
     }
   }
 
-  def startSequenceGenerator(prefix: SourceType, indexType: IndexType): () => Seq[TokenType] = {
-    startSequenceGenerator(tokenExtractor(prefix), indexType)
+  def startSequenceGenerator(prefix: SourceType): () => Seq[TokenType] = {
+    startSequenceGenerator(tokenExtractor(prefix))
   }
 
   private def isPrefix(a: Seq[TokenType], b: Seq[TokenType]) = {
