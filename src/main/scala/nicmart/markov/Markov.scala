@@ -9,16 +9,16 @@ object Markov {
 
   def main(args: Array[String]): Unit = {
     val arguments = getArg(args) _
-    val leftWindowMaxSize = arguments(0, "2").toInt
-    val rightWindowSize = arguments(1, "1").toInt
+    val windowSize = arguments(0, "3").toInt
+    val exponentialEntropy = arguments(1, "1.4").toDouble
     val samePrefixPerSentence = arguments(2, "true").toBoolean
     val source = arguments(3, "mostrasprint")
     val prefix = arguments(4, "")
 
     val sourceString = source.split("\\|").map(getSource(_)).mkString("\n\n")
-    val indexType = IndexType(leftWindowMaxSize, rightWindowSize, Forward)
+    val indexType = IndexType(windowSize - 1, 1, Forward)
 
-    val engine = new MarkovEngine[String, TokenType](sourceString, leftWindowMaxSize, rightWindowSize)
+    val engine = new MarkovEngine[String, TokenType](sourceString, windowSize, exponentialEntropy)
     val startSequenceGenerator = engine.startSequenceGenerator(prefix, indexType)
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])

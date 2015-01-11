@@ -9,7 +9,7 @@
 
 package nicmart.markov
 
-import nicmart.markov.IndexType.Forward
+import nicmart.markov.IndexType.{Direction, Forward}
 import nicmart.{WeightedRandomDistribution, WeightedValue}
 import nicmart.markov.Helpers._
 
@@ -27,7 +27,7 @@ import scala.util.Random
  *          has the closest entropy to the given one (0.1 should be a good fit)
  */
 class MarkovEngine[SourceType, TokenType]
-    (source: SourceType, maxStateSize: Int, inputSize: Int)
+    (source: SourceType, windowSize: Int, exponentialEntropy: Double)
     (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
 
   type Distribution = (IndexType, State) => Option[Input]
@@ -38,25 +38,21 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Index Types: forward and backward from 1 to the maxStateSize
    */
-  val indexTypes: Seq[IndexType] = (1 to maxStateSize)
-    .map(IndexType(_, inputSize, Forward))
+  val indexTypes: Seq[IndexType] = (1 to windowSize - 1)
+    .map(keySize => IndexType(keySize, windowSize - keySize, Forward))
     .flatMap(indexType => List(indexType, indexType.opposite))
 
-  private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](maxStateSize)
-  private val maxWindowSize = maxStateSize + inputSize
+  private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](windowSize - 1)
   private val tokens: Seq[TokenType] = tokenExtractor(source)
-  private val distributionMapsWithEntropy = distributionsMap
-  private val distributions: Distribution = distributionFromMap(distributionMapsWithEntropy)
+  private val distributionMapsWithEntropy: Map[
+      (IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])
+    ] = distributionsMap
 
-  private val chains: IndexType => DefaultStateAutomatonChain[State, Input] = indexTypes.map{
-    indexType => (
-      indexType,
-      DefaultStateAutomatonChain[State, Input](
-        automaton,
-        (s: State) => distributions(indexType, s)
-      )
+  private val chain: DefaultStateAutomatonChain[State, Input] =
+    DefaultStateAutomatonChain[State, Input](
+      automaton,
+      distribution(_, Forward)
     )
-  }.toMap
 
 
   private val defaultIndexType = indexTypes(0)
@@ -66,7 +62,7 @@ class MarkovEngine[SourceType, TokenType]
    */
   def stream(prefix: Traversable[TokenType], indexType: IndexType): Stream[TokenType] = {
     val from: State = prefix.take(indexType.keyLength)
-    val outputStream: Stream[Input] = chains(indexType).flattenOutputStream(from)
+    val outputStream: Stream[Input] = chain.flattenOutputStream(from)
     prefix.toStream ++ outputStream.flatten
   }
 
@@ -80,10 +76,11 @@ class MarkovEngine[SourceType, TokenType]
   ): Stream[Stream[TokenType]] = {
 
     val forwardStream: Stream[TokenType] = stream(startSequence, indexType)
-    val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, indexType.opposite)
+    //val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, indexType.opposite)
 
-    val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
-    val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
+    //val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
+    //val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
+    val markovStream = forwardStream.drop(startSequence.length)
 
     markovStream.sentenceStream(separator)
   }
@@ -98,7 +95,7 @@ class MarkovEngine[SourceType, TokenType]
 
     () => {
       if (length == 0) {
-        val index = Random.nextInt(tokens.length - maxWindowSize)
+        val index = Random.nextInt(tokens.length - windowSize)
         tokens.slice(index, index + indexType.keyLength)
       } else {
         candidates(Random.nextInt(length))
@@ -120,10 +117,13 @@ class MarkovEngine[SourceType, TokenType]
   private def distributionsMap: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])] = {
     // Build counter maps
     val elementsToCount = for (
-      window <- tokens.sliding(maxWindowSize);
+      window <- tokens.sliding(windowSize);
       indexType <- indexTypes;
       (keys, values) = indexType.keysAndValues(window)
-    ) yield ((indexType, keyBuilder(keys)), values)
+    ) yield {
+      //println(s"$indexType ${keyBuilder(keys)} --> ${values.mkString(" ")}")
+      ((indexType, keyBuilder(keys)), values)
+    }
 
     val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
 
@@ -165,18 +165,32 @@ class MarkovEngine[SourceType, TokenType]
     )}
   }
 
-  private def distributionFromMap(
-      randomDistribs: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])]
-    ): Distribution = {
-    (indexType: IndexType, from: State) => {
-      val key = keyBuilder(from)
-      if (randomDistribs.isDefinedAt((indexType, key))) Some(randomDistribs((indexType, key))._2()) else None
+  /**
+   * The distribution function
+   * Still a bit a mess in order to print stats and debug info
+   */
+  private def distribution(state: State, direction: Direction): Option[Input] = {
+    val distancesAndDists: Iterable[(IndexType, Double, WeightedRandomDistribution[Input])] = for (
+      indexType <- indexTypes if indexType.direction == direction;
+      key = keyBuilder(indexType.keys(state));
+      (entropy, distMap) = distributionMapsWithEntropy((indexType, key))
+    ) yield {
+      val dist = math.abs(math.pow(2, entropy) - exponentialEntropy)
+      //println(s"${indexType} --> Entropy: ${math.pow(2, entropy)}, expEntropy: $exponentialEntropy, dist: $dist")
+      (indexType, dist, distMap)
     }
-  }
 
-  private def selectIndexType(state: State) = {
-    val states = state.scanRight(List[TokenType]())((token, list) => token :: list)
+    //val min = distancesAndDists.minBy{ case (indexType, distance, _) => (distance, -indexType.keyLength) }
 
+    def weightFormula(d: Double, k: Int = 1) = 100000 / (d + k)
 
+    val weightedDists = distancesAndDists
+      .map{case (indexType, distance, distMap) => WeightedValue((indexType, distMap), weightFormula(distance))}
+    val randomDistOfDist = new WeightedRandomDistribution(weightedDists)
+    val dist = randomDistOfDist()
+
+    //Some(min._3())
+    //println(dist._1)
+    Some(dist._2())
   }
 }

@@ -23,6 +23,11 @@ case class IndexType(keyLength: Int, valueLength: Int, direction: Direction) {
     if (direction == Forward) window.splitAt(keyLength) else window.reverse.splitAt(keyLength)
   }
 
+  def keys[T](sequence: Traversable[T]): Traversable[T] = {
+    val seq = if (direction == Forward) sequence else sequence.toSeq.reverse
+    seq.drop(sequence.size - keyLength)
+  }
+
   def opposite = IndexType(keyLength, valueLength, direction.opposite)
 }
 
