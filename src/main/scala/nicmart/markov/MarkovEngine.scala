@@ -38,12 +38,13 @@ class MarkovEngine[SourceType, TokenType]
   /**
    * Index Types: forward and backward from 1 to the maxStateSize
    */
-  val indexTypes: Seq[IndexType] = (1 to windowSize - 1)
-    .map(keySize => IndexType(keySize, windowSize - keySize, Forward))
-    .flatMap(indexType => List(indexType, indexType.opposite))
+  val indexTypes: Seq[IndexType] = IndexType(windowSize, 1, Forward) +:
+    (1 to windowSize - 1)
+      .map(keySize => IndexType(keySize, windowSize - keySize, Forward))
+      .flatMap(indexType => List(indexType, indexType.opposite))
 
-  private val stateSize = windowSize - 1
-  private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](windowSize - 1)
+  private val stateSize = windowSize
+  private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](stateSize)
   private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributionMapsWithEntropy: Map[
       (IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])
@@ -60,8 +61,7 @@ class MarkovEngine[SourceType, TokenType]
    * The Markov chain stream
    */
   def stream(prefix: Traversable[TokenType], direction: Direction): Stream[TokenType] = {
-    val from: State = prefix.take(stateSize)
-    val outputStream: Stream[Input] = chains(direction).flattenOutputStream(from)
+    val outputStream: Stream[Input] = chains(direction).flattenOutputStream(prefix)
     prefix.toStream ++ outputStream.flatten
   }
 
@@ -78,20 +78,20 @@ class MarkovEngine[SourceType, TokenType]
     val backwardStream: Stream[TokenType] = stream(startSequence.toSeq.reverse, direction.opposite)
 
     val prefixStream = backwardStream.takeUntil(separator, 1, false).take(10000).dropRight(1)
-    val markovStream = prefixStream.reverse #::: forwardStream.drop(startSequence.length)
+    val markovStream = prefixStream.reverse  #::: forwardStream.drop(startSequence.size)
 
     markovStream.sentenceStream(separator)
   }
 
   def startSequenceGenerator(prefix: Traversable[TokenType]): () => Seq[TokenType] = {
     val candidates: Seq[Seq[TokenType]] =
-      tokens.sliding(windowSize - 1).filter(isPrefix(prefix.toSeq, _)).toSeq
+      tokens.sliding(windowSize).filter(isPrefix(prefix.toSeq, _)).toSeq
     val length = candidates.length
 
     () => {
       if (length == 0) {
-        val index = Random.nextInt(tokens.length - windowSize)
-        tokens.slice(index, index + windowSize - 1)
+        val index = Random.nextInt(tokens.length - windowSize + 1)
+        tokens.slice(index, index + windowSize)
       } else {
         candidates(Random.nextInt(length))
       }

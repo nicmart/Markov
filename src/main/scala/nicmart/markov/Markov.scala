@@ -26,7 +26,9 @@ object Markov {
       .andThen(NewLineDecorator)
 
     val sentencesStream: Stream[Stream[String]] = (if (samePrefixPerSentence) Helpers.inifiniteStream {
-      engine.sentenceStream(startSequenceGenerator(), Forward, ".").take(1)
+      val prefix = startSequenceGenerator()
+      //println("Prefix: " + prefix)
+      engine.sentenceStream(prefix, Forward, ".").take(1)
     } else {
       engine.sentenceStream(startSequenceGenerator(), Forward, ".")
     }).map(renderer(_))
