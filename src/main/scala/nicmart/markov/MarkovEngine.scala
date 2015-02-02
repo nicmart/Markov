@@ -110,15 +110,24 @@ class MarkovEngine[SourceType, TokenType]
    * Build the index of markov maps
    */
   private def distributionsMap: Map[(IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])] = {
+
+    val indexesByLength = indexTypes.groupBy(x => x.keyLength + x.valueLength)
+    println(indexesByLength)
+
     // Build counter maps
     val elementsToCount = for (
-      window <- tokens.sliding(windowSize);
-      indexType <- indexTypes;
+      (windowLength, indexTypesOfGivenLength) <- indexesByLength.toList; //Otherwise it will become a map!
+      window <- { println(windowLength); println(indexTypesOfGivenLength); tokens.sliding(windowLength) };
+      indexType <- indexTypesOfGivenLength;
       (keys, values) = indexType.keysAndValues(window)
     ) yield {
       //println(s"$indexType ${keyBuilder(keys)} --> ${values.mkString(" ")}")
+      //println("Keys: " + keyBuilder(keys))
+      //println("values: " + values)
       ((indexType, keyBuilder(keys)), values)
     }
+
+    //println(elementsToCount)
 
     val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
 
@@ -126,11 +135,13 @@ class MarkovEngine[SourceType, TokenType]
     println("Entropy Stats")
     countMaps.reindexBy(_._1).filter{case (IndexType(_,_, Forward), _) => true; case _ => false}.foreach{
       case (indexType, map) => {
+        println(map.take(5).toString)
+
         map.reindexBy(_._2.matches(".*\\p{P}.*")).foreach{
           case (withPunctuation, innerMap) => {
             val dotString = if (withPunctuation) "with punct." else "without punct."
             val (mean, deviation, entropies) = (new ChainStats(innerMap)).entropyMeanAndDeviation
-            println(s"${indexType.toString} (${dotString}). mean: ${mean}, deviation: ${deviation}")
+            println(s"${indexType.toString} (${dotString}). size: ${innerMap.size} mean: ${mean}, deviation: ${deviation}")
             println("Entropies (Top 10): ")
             val total = entropies.size
             val stats = entropies.groupBy(x => x)
