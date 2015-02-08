@@ -1,5 +1,7 @@
 package nicmart.markov
 
+import nicmart.markov.index.{InvertibleIndex, BasicIndexer}
+import nicmart.markov.request._
 import Helpers._
 import IndexType._
 import com.gravity.goose.Goose
@@ -7,25 +9,30 @@ import com.gravity.goose.Goose
 object Markov {
   type TokenType = String
 
+  val tokenExtractor = TokenExtractor.stringTokenExtractor
+
   def main(args: Array[String]): Unit = {
-    val arguments = getArg(args) _
-    val windowSize = arguments(0, "3").toInt
-    val exponentialEntropy = arguments(1, "1.4").toDouble
-    val samePrefixPerSentence = arguments(2, "true").toBoolean
-    val source = arguments(3, "mostrasprint")
-    val prefix = arguments(4, "")
+    val request = Request(args)
 
-    val sourceString = source.split("\\|").map(getSource(_)).mkString("\n\n")
-    val indexType = IndexType(windowSize - 1, 1, Forward)
+    val sourceString = request.source.split("\\|").map(getSource(_)).mkString("\n\n")
 
-    val engine = new MarkovEngine[String, TokenType](sourceString, windowSize, exponentialEntropy)
-    val startSequenceGenerator = engine.startSequenceGenerator(prefix)
+    val tokens: Seq[String] = tokenExtractor(sourceString)
+    val indexer = new BasicIndexer[TokenType](InvertibleIndex[TokenType])
+    val (intIndex, intTokens) = indexer.indexAndMap(tokens)
+
+    println(intTokens.take(100))
+    println(s"Number of Tokens: ${intIndex.size}")
+
+    val indexType = IndexType(request.windowSize - 1, 1, Forward)
+
+    val engine = new MarkovEngine[TokenType](tokens, request.windowSize, request.exponentialEntropy)
+    val startSequenceGenerator = engine.startSequenceGenerator(tokenExtractor(request.prefix))
 
     val renderer = (new PunctuationWordStreamRenderer[TokenType])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
-    val sentencesStream: Stream[Stream[String]] = (if (samePrefixPerSentence) Helpers.inifiniteStream {
+    val sentencesStream: Stream[Stream[String]] = (if (request.samePrefixPerSentence) Helpers.inifiniteStream {
       val prefix = startSequenceGenerator()
       //println("Prefix: " + prefix)
       engine.sentenceStream(prefix, Forward, ".").take(1)
@@ -48,10 +55,6 @@ object Markov {
     println("** Free Memory:  " + runtime.freeMemory / mb)
     println("** Total Memory: " + runtime.totalMemory / mb)
     println("** Max Memory:   " + runtime.maxMemory / mb)
-  }
-
-  def getArg(args: Array[String])(position: Int, default: String) = {
-    if (args.isDefinedAt(position)) args(position) else default
   }
 
   def config = {

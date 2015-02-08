@@ -21,6 +21,8 @@ trait Index[T] {
   def add(term: T): Index[T]
 
   def indexAndGet(term: T): Int = add(term).apply(term)
+
+  def size: Int
 }
 
 object Index {

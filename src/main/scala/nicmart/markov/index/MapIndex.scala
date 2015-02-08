@@ -29,4 +29,6 @@ class MapIndex[T] extends Index[T] {
 
     this
   }
+
+  def size: Int = map.size
 }

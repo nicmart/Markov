@@ -26,9 +26,9 @@ import scala.util.Random
  *       5. The dist function passed to the chain has to select the index type for which the given input
  *          has the closest entropy to the given one (0.1 should be a good fit)
  */
-class MarkovEngine[SourceType, TokenType]
-    (source: SourceType, windowSize: Int, exponentialEntropy: Double)
-    (implicit tokenExtractor: TokenExtractor[SourceType, TokenType], keyBuilder: KeyBuilder[TokenType, String]) {
+class MarkovEngine[TokenType]
+    (tokens: Seq[TokenType], windowSize: Int, exponentialEntropy: Double)
+    (implicit keyBuilder: KeyBuilder[TokenType, String]) {
 
   type Distribution = (IndexType, State) => Option[Input]
   type State = Traversable[TokenType]
@@ -45,7 +45,6 @@ class MarkovEngine[SourceType, TokenType]
 
   private val stateSize = windowSize
   private val automaton: StateAutomaton[State, State] = new SymbolStringAutomaton[TokenType](stateSize)
-  private val tokens: Seq[TokenType] = tokenExtractor(source)
   private val distributionMapsWithEntropy: Map[
       (IndexType, IndexedState), (Double, WeightedRandomDistribution[Input])
     ] = distributionsMap
@@ -96,10 +95,6 @@ class MarkovEngine[SourceType, TokenType]
         candidates(Random.nextInt(length))
       }
     }
-  }
-
-  def startSequenceGenerator(prefix: SourceType): () => Seq[TokenType] = {
-    startSequenceGenerator(tokenExtractor(prefix))
   }
 
   private def isPrefix(a: Seq[TokenType], b: Seq[TokenType]) = {
