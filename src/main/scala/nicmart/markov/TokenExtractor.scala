@@ -12,8 +12,11 @@ package nicmart.markov
 /**
  * Trait Description
  */
-trait TokenExtractor[A, B] extends (A => Seq[B]) {
+trait TokenExtractor[A, B] extends (A => Seq[B]) { self =>
   def apply(source: A): Seq[B]
+  def map[C](f: B => C) = new TokenExtractor[A, C] {
+    def apply(source: A): Seq[C] = self.apply(source).view.map(f)
+  }
 }
 
 object TokenExtractor {

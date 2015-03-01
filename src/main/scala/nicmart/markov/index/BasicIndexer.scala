@@ -12,9 +12,9 @@ package nicmart.markov.index
 /**
  * A basic implementation of an indexer
  */
-class BasicIndexer[T](indexFactory: => Index[T] = new MapIndex[T]) extends Indexer[T] {
+class BasicIndexer[From, To](indexFactory: => Index[From, To] = Index[From, Int]) extends Indexer[From, To] {
 
-  def index(collection: Traversable[T]): Index[T] = {
+  def index(collection: Traversable[From]): Index[From, To] = {
 
     val index = indexFactory
 
@@ -25,7 +25,7 @@ class BasicIndexer[T](indexFactory: => Index[T] = new MapIndex[T]) extends Index
     index
   }
 
-  def indexAndMap(collection: Traversable[T]): (Index[T], Traversable[Int]) = {
+  def indexAndMap(collection: Traversable[From]): (Index[From, To], Traversable[To]) = {
 
     val index = indexFactory
 

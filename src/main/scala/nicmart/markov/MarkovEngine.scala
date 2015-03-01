@@ -27,13 +27,12 @@ import scala.util.Random
  *          has the closest entropy to the given one (0.1 should be a good fit)
  */
 class MarkovEngine[TokenType]
-    (tokens: Seq[TokenType], windowSize: Int, exponentialEntropy: Double)
-    (implicit keyBuilder: KeyBuilder[TokenType, String]) {
+    (tokens: Seq[TokenType], windowSize: Int, exponentialEntropy: Double){
 
   type Distribution = (IndexType, State) => Option[Input]
   type State = Traversable[TokenType]
   type Input = Traversable[TokenType]
-  type IndexedState = String
+  type IndexedState = State
 
   /**
    * Index Types: forward and backward from 1 to the maxStateSize
@@ -98,7 +97,7 @@ class MarkovEngine[TokenType]
   }
 
   private def isPrefix(a: Seq[TokenType], b: Seq[TokenType]) = {
-    keyBuilder(a) == keyBuilder(b.take(a.length))
+    a == b.take(a.length)
   }
 
   /**
@@ -119,15 +118,16 @@ class MarkovEngine[TokenType]
       //println(s"$indexType ${keyBuilder(keys)} --> ${values.mkString(" ")}")
       //println("Keys: " + keyBuilder(keys))
       //println("values: " + values)
-      ((indexType, keyBuilder(keys)), values)
+      ((indexType, keys), values)
     }
 
     //println(elementsToCount)
 
-    val countMaps = Counter.countPairs[(IndexType, String), Input](elementsToCount.toTraversable)
+    val countMaps = Counter.countPairs[(IndexType, Traversable[TokenType]), Input](elementsToCount.toTraversable)
 
     println("-" * 80)
     println("Entropy Stats")
+    /*
     countMaps.reindexBy(_._1).filter{case (IndexType(_,_, Forward), _) => true; case _ => false}.foreach{
       case (indexType, map) => {
         println(map.take(5).toString)
@@ -154,6 +154,7 @@ class MarkovEngine[TokenType]
         }
       }
     }
+*/
 
     val (mean, deviation, _) = (new ChainStats(countMaps)).entropyMeanAndDeviation
 
@@ -173,7 +174,7 @@ class MarkovEngine[TokenType]
   private def distribution(state: State, direction: Direction): Option[Input] = {
     val distancesAndDists: Iterable[(IndexType, Double, WeightedRandomDistribution[Input])] = for (
       indexType <- indexTypes if indexType.direction == direction;
-      key = keyBuilder(indexType.keys(state));
+      key = indexType.keys(state);
       (entropy, distMap) = distributionMapsWithEntropy((indexType, key))
     ) yield {
       val dist = math.abs(math.pow(2, entropy) - exponentialEntropy)

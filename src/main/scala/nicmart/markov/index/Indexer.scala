@@ -13,11 +13,11 @@ package nicmart.markov.index
 /**
  * Transform collections to indexes
  */
-trait Indexer[T] extends (Traversable[T] => Index[T]) {
+trait Indexer[From, To] extends (Traversable[From] => Index[From, To]) {
 
-  def apply(collection: Traversable[T]): Index[T] = index(collection)
+  def apply(collection: Traversable[From]): Index[From, To] = index(collection)
 
-  def index(collection: Traversable[T]): Index[T]
+  def index(collection: Traversable[From]): Index[From, To]
 
-  def indexAndMap(collection: Traversable[T]): (Index[T], Traversable[Int])
+  def indexAndMap(collection: Traversable[From]): (Index[From, To], Traversable[To])
 }

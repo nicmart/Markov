@@ -12,20 +12,30 @@ package nicmart.markov.index
 /**
  * An integer index of objects of type T
  */
-trait Index[T] {
+trait Index[From, To] {
 
-  def isIndexed(term: T): Boolean
+  def isIndexed(term: From): Boolean
 
-  def apply(term: T): Int
+  def apply(term: From): To
 
-  def add(term: T): Index[T]
+  def add(term: From): Index[From, To]
 
-  def indexAndGet(term: T): Int = add(term).apply(term)
+  def indexAndGet(term: From): To = add(term).apply(term)
 
   def size: Int
+
+  def indexExists(index: To): Boolean
+
+  def invert(index: To): From
 }
 
 object Index {
 
-  def apply[T]: Index[T] = new MapIndex[T]
+  def apply[From, To <: Int](implicit evidence: To =:= Int) = new MapIndex[From, Int] {
+    protected def nextAvailableIndex: Int = size
+  }
+
+  def apply[From, To <: Short](implicit evidence: To =:= Short, a: DummyImplicit) = new MapIndex[From, Short] {
+    protected def nextAvailableIndex: Short = size.toShort
+  }
 }

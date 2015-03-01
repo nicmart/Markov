@@ -10,6 +10,7 @@
 package nicmart.markov
 
 import Helpers._
+import nicmart.markov.index.Index
 
 /**
  * Class Description
@@ -27,6 +28,13 @@ object StreamRenderer {
   val noSpaceBeforeRegexp = """^(\.|,|;|:|'|\?|!|\)|\]|\}|»|’|…).*"""
   val noSpaceAfterRegexp = """^('|\(|\[|\{|«|’|#|@).*"""
   val capitalizeAfterRegexp = """^(\.|\?|!).*"""
+}
+
+/**
+ * Renderer that transform
+ */
+case class IndexBasedRenderer[TokenType](index: Index[String, TokenType]) extends StreamRenderer[TokenType] {
+  def apply(tokens: Stream[TokenType]) = tokens.map(index.invert(_))
 }
 
 /**

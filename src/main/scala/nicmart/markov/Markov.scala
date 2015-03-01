@@ -1,13 +1,14 @@
 package nicmart.markov
 
-import nicmart.markov.index.{InvertibleIndex, BasicIndexer}
+import nicmart.markov.index.{Index, BasicIndexer}
 import nicmart.markov.request._
 import Helpers._
 import IndexType._
 import com.gravity.goose.Goose
 
 object Markov {
-  type TokenType = String
+  type Token = String
+  type EncodedToken = Short
 
   val tokenExtractor = TokenExtractor.stringTokenExtractor
 
@@ -17,27 +18,30 @@ object Markov {
     val sourceString = request.source.split("\\|").map(getSource(_)).mkString("\n\n")
 
     val tokens: Seq[String] = tokenExtractor(sourceString)
-    val indexer = new BasicIndexer[TokenType](InvertibleIndex[TokenType])
+    val indexer = new BasicIndexer[Token, EncodedToken](Index[Token, EncodedToken])
     val (intIndex, intTokens) = indexer.indexAndMap(tokens)
+    val intTokenExtractor = tokenExtractor.map(intIndex(_))
+    val intDot = intIndex(".")
 
     println(intTokens.take(100))
     println(s"Number of Tokens: ${intIndex.size}")
 
     val indexType = IndexType(request.windowSize - 1, 1, Forward)
 
-    val engine = new MarkovEngine[TokenType](tokens, request.windowSize, request.exponentialEntropy)
-    val startSequenceGenerator = engine.startSequenceGenerator(tokenExtractor(request.prefix))
+    val engine = new MarkovEngine[EncodedToken](intTokens.toSeq, request.windowSize, request.exponentialEntropy)
+    val startSequenceGenerator = engine.startSequenceGenerator(intTokenExtractor(request.prefix))
 
-    val renderer = (new PunctuationWordStreamRenderer[TokenType])
+    val renderer = IndexBasedRenderer(intIndex)
+      .andThen(new PunctuationWordStreamRenderer[Token])
       .andThen(CapitalizeAfterDot)
       .andThen(NewLineDecorator)
 
     val sentencesStream: Stream[Stream[String]] = (if (request.samePrefixPerSentence) Helpers.inifiniteStream {
       val prefix = startSequenceGenerator()
       //println("Prefix: " + prefix)
-      engine.sentenceStream(prefix, Forward, ".").take(1)
+      engine.sentenceStream(prefix, Forward, intDot).take(1)
     } else {
-      engine.sentenceStream(startSequenceGenerator(), Forward, ".")
+      engine.sentenceStream(startSequenceGenerator(), Forward, intDot)
     }).map(renderer(_))
 
     // Input stream. I add an element on the head to always print the first sentence

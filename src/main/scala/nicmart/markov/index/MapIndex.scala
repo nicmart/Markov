@@ -14,21 +14,30 @@ import scala.collection.mutable
 /**
  * A Map-based index
  */
-class MapIndex[T] extends Index[T] {
+trait MapIndex[From, To] extends Index[From, To]{
 
-  private[this] val map: mutable.Map[T, Int] = mutable.Map()
+  private[this] val directMap: mutable.Map[From, To] = mutable.Map()
+  private[this] val inverseMap: mutable.Map[To, From] = mutable.Map()
 
-  def isIndexed(term: T): Boolean = map.isDefinedAt(term)
+  def isIndexed(term: From): Boolean = directMap.isDefinedAt(term)
 
-  def apply(term: T): Int = map(term)
+  def apply(term: From): To = directMap(term)
 
-  def add(term: T): Index[T] = {
+  def add(term: From): Index[From, To] = {
     if (!isIndexed(term)) {
-      map(term) = map.size + 1
+      val index = nextAvailableIndex
+      directMap(term) = index
+      inverseMap(index) = term
     }
 
     this
   }
 
-  def size: Int = map.size
+  override def size: Int = directMap.size
+
+  def indexExists(index: To): Boolean = inverseMap.isDefinedAt(index)
+
+  def invert(index: To): From = inverseMap(index)
+
+  protected def nextAvailableIndex: To
 }
